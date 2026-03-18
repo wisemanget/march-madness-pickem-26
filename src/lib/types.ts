@@ -21,6 +21,7 @@ export interface DraftState {
 
 export interface TournamentResults {
   wins: Record<string, number>;
+  eliminated: string[];  // teams that have lost
   updatedAt: string;
 }
 
@@ -56,3 +57,29 @@ export const DEFAULT_PARTICIPANTS = [
 ];
 
 export type ParticipantName = string;
+
+// Live game data from ESPN
+export interface LiveGame {
+  id: string;
+  status: "pre" | "in" | "post"; // pre-game, in-progress, final
+  statusDetail: string; // e.g. "Final", "Halftime", "2nd Half 5:32"
+  round: string; // e.g. "Round of 64", "Sweet 16", etc.
+  startTime: string; // ISO date
+  homeTeam: {
+    name: string;       // Our mapped team name (or ESPN name if no match)
+    espnName: string;   // Original ESPN display name
+    seed: number;
+    score: number;
+    logo?: string;
+    winner: boolean;
+  };
+  awayTeam: {
+    name: string;
+    espnName: string;
+    seed: number;
+    score: number;
+    logo?: string;
+    winner: boolean;
+  };
+  broadcast?: string;
+}

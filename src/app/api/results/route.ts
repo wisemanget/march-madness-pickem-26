@@ -4,7 +4,10 @@ import { TournamentResults } from "@/lib/types";
 
 export async function GET() {
   const results = await store.getResults();
-  return NextResponse.json(results || { wins: {}, updatedAt: "" });
+  // Backfill eliminated field for old data
+  const data = results || { wins: {}, eliminated: [], updatedAt: "" };
+  if (!data.eliminated) data.eliminated = [];
+  return NextResponse.json(data);
 }
 
 export async function POST(request: Request) {
@@ -18,8 +21,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // Preserve existing eliminated list if not provided
+  const existing = await store.getResults();
   const results: TournamentResults = {
     wins,
+    eliminated: body.eliminated || existing?.eliminated || [],
     updatedAt: new Date().toISOString(),
   };
 
