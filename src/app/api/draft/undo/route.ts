@@ -39,13 +39,6 @@ export async function POST(request: Request) {
   state.currentPickIndex = Math.max(0, state.currentPickIndex - 1);
   state.status = "drafting";
 
-  // Reset timer for restored turn
-  if (state.pickTimerSeconds > 0) {
-    state.pickDeadline = new Date(
-      Date.now() + state.pickTimerSeconds * 1000
-    ).toISOString();
-  }
-
   state.version++;
   state.updatedAt = new Date().toISOString();
   await store.setDraftState(state);

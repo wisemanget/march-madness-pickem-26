@@ -12,13 +12,10 @@ export interface Pick {
 }
 
 export interface DraftState {
-  status: "waiting" | "drafting" | "complete";
+  status: "drafting" | "complete";
   picks: Pick[];
   currentPickIndex: number;
   version: number;
-  pickTimerSeconds: number;
-  pickDeadline: string | null;
-  readyParticipants: string[];
   updatedAt: string;
 }
 

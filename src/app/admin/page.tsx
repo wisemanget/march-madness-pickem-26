@@ -88,9 +88,6 @@ function AdminContent() {
   // PIN management
   const [editPins, setEditPins] = useState<Record<string, string>>({});
 
-  // Timer config
-  const [timerSeconds, setTimerSeconds] = useState(90);
-
   // Admin PIN change
   const [newAdminPin, setNewAdminPin] = useState("");
 
@@ -118,12 +115,6 @@ function AdminContent() {
       setNewAdminPin("");
     }
   }, [settings]);
-
-  useEffect(() => {
-    if (state?.pickTimerSeconds !== undefined) {
-      setTimerSeconds(state.pickTimerSeconds);
-    }
-  }, [state?.pickTimerSeconds]);
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -159,29 +150,6 @@ function AdminContent() {
     await refetch();
     setResetting(false);
     showMsg("Draft has been reset!");
-  };
-
-  const handleConfigureTimer = async () => {
-    const res = await fetch("/api/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "configure-timer",
-        pickTimerSeconds: timerSeconds,
-        adminPin,
-      }),
-    });
-    if (res.ok) {
-      await refetch();
-      showMsg(
-        timerSeconds > 0
-          ? `Timer set to ${timerSeconds} seconds`
-          : "Timer disabled"
-      );
-    } else {
-      const err = await res.json();
-      showMsg(err.error || "Failed to configure timer", "error");
-    }
   };
 
   const handleWinChange = (teamName: string, wins: number) => {
@@ -366,8 +334,6 @@ function AdminContent() {
                   className={`font-bold ${
                     state?.status === "complete"
                       ? "text-green-400"
-                      : state?.status === "waiting"
-                      ? "text-yellow-400"
                       : "text-amber-400"
                   }`}
                 >
@@ -396,34 +362,8 @@ function AdminContent() {
               {resetting ? "Resetting..." : "🗑️ Reset Draft"}
             </button>
             <p className="text-xs text-slate-500 mt-2">
-              This clears all picks and resets to lobby (waiting) state.
+              This clears all picks and resets the draft.
             </p>
-          </div>
-
-          {/* Timer Configuration */}
-          <div className="border-t border-slate-700/50 pt-5">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <span>⏱️</span> Pick Timer
-            </h3>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                min={0}
-                max={600}
-                value={timerSeconds}
-                onChange={(e) =>
-                  setTimerSeconds(parseInt(e.target.value) || 0)
-                }
-                className="w-24 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-amber-500/50"
-              />
-              <span className="text-slate-400 text-sm">seconds (0 = disabled)</span>
-              <button
-                onClick={handleConfigureTimer}
-                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold px-4 py-2 rounded-lg transition"
-              >
-                Save
-              </button>
-            </div>
           </div>
         </div>
       )}

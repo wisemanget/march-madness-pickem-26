@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -69,158 +69,6 @@ function Confetti() {
         />
       ))}
     </>
-  );
-}
-
-function CountdownTimer({
-  deadline,
-  onExpired,
-}: {
-  deadline: string;
-  onExpired: () => void;
-}) {
-  const [remaining, setRemaining] = useState(0);
-  const expiredRef = useRef(false);
-
-  useEffect(() => {
-    expiredRef.current = false;
-    const tick = () => {
-      const ms = new Date(deadline).getTime() - Date.now();
-      const sec = Math.max(0, Math.ceil(ms / 1000));
-      setRemaining(sec);
-      if (sec <= 0 && !expiredRef.current) {
-        expiredRef.current = true;
-        onExpired();
-      }
-    };
-    tick();
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [deadline, onExpired]);
-
-  const pct = remaining > 0 ? (remaining / 90) * 100 : 0;
-  const urgent = remaining <= 10;
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            urgent
-              ? "bg-red-500 animate-pulse"
-              : "bg-gradient-to-r from-amber-500 to-orange-500"
-          }`}
-          style={{ width: `${Math.min(100, pct)}%` }}
-        />
-      </div>
-      <span
-        className={`font-mono font-bold text-sm min-w-[3ch] text-right ${
-          urgent ? "text-red-400 animate-pulse" : "text-amber-400"
-        }`}
-      >
-        {remaining}s
-      </span>
-    </div>
-  );
-}
-
-function DraftLobby({
-  myName,
-  participants,
-  readyParticipants,
-  onReady,
-  onStart,
-}: {
-  myName: string;
-  participants: string[];
-  readyParticipants: string[];
-  onReady: () => void;
-  onStart: () => void;
-}) {
-  const allReady = participants.every((p) => readyParticipants.includes(p));
-  const amReady = readyParticipants.includes(myName);
-
-  return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="text-center animate-slide-up">
-        <div className="text-5xl mb-3 animate-float inline-block">🏀</div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-gradient">
-          Draft Lobby
-        </h2>
-        <p className="text-slate-400 mt-2">
-          Waiting for all participants to ready up...
-        </p>
-      </div>
-
-      <div className="glass-card rounded-2xl p-4 sm:p-6 animate-slide-up">
-        <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-          <span>👥</span> Participants ({readyParticipants.length}/
-          {participants.length} ready)
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {participants.map((name) => {
-            const isReady = readyParticipants.includes(name);
-            return (
-              <div
-                key={name}
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                  isReady
-                    ? "bg-green-900/30 border-green-500/50"
-                    : "bg-slate-800/50 border-slate-700/50"
-                } ${name === myName ? "ring-2 ring-amber-400/50" : ""}`}
-              >
-                <span
-                  className={`w-3 h-3 rounded-full shrink-0 ${
-                    isReady ? "bg-green-400" : "bg-slate-600 animate-pulse"
-                  }`}
-                />
-                <span className="font-medium text-sm truncate">
-                  {name}
-                  {name === myName && (
-                    <span className="text-amber-400 text-[10px] ml-1">
-                      (you)
-                    </span>
-                  )}
-                </span>
-                {isReady && <span className="ml-auto text-green-400">✓</span>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 animate-slide-up">
-        {myName && !amReady && (
-          <button
-            onClick={onReady}
-            className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold py-4 rounded-xl text-lg transition shadow-lg shadow-green-500/20 active:scale-[0.98]"
-          >
-            ✅ I&apos;m Ready!
-          </button>
-        )}
-        {amReady && !allReady && (
-          <div className="text-center text-green-400 font-medium py-3 animate-pulse">
-            Waiting for others...
-          </div>
-        )}
-        {allReady && (
-          <button
-            onClick={onStart}
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-bold py-4 rounded-xl text-lg transition shadow-lg shadow-amber-500/20 active:scale-[0.98] animate-bounce-in"
-          >
-            🏀 Start Draft!
-          </button>
-        )}
-        {!myName && (
-          <div className="glass-card border border-yellow-600/50 rounded-xl p-3 text-center text-yellow-300 text-sm">
-            <a href="/" className="underline font-medium">
-              Go to home page
-            </a>{" "}
-            to select who you are before readying up.
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -312,27 +160,6 @@ export default function DraftPage() {
     }
   };
 
-  const handleReady = async () => {
-    await fetch("/api/draft/ready", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        participantName: myName,
-        pin: myPin || undefined,
-      }),
-    });
-    await refetch();
-  };
-
-  const handleStart = async () => {
-    await fetch("/api/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start" }),
-    });
-    await refetch();
-  };
-
   const handleUndo = async () => {
     if (!confirm("Undo the last pick?")) return;
     const adminPin = sessionStorage.getItem("mm-admin-pin");
@@ -352,15 +179,6 @@ export default function DraftPage() {
     await refetch();
   };
 
-  const handleAutoPickExpired = useCallback(async () => {
-    try {
-      await fetch("/api/draft/auto-pick", { method: "POST" });
-      await refetch();
-    } catch {
-      // Will be picked up by next poll
-    }
-  }, [refetch]);
-
   if (loading || settingsLoading || !state) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -371,19 +189,6 @@ export default function DraftPage() {
           </div>
         </div>
       </div>
-    );
-  }
-
-  // Lobby view
-  if (state.status === "waiting") {
-    return (
-      <DraftLobby
-        myName={myName}
-        participants={participants}
-        readyParticipants={state.readyParticipants || []}
-        onReady={handleReady}
-        onStart={handleStart}
-      />
     );
   }
 
@@ -459,15 +264,6 @@ export default function DraftPage() {
             </div>
           )}
 
-          {/* Pick Timer */}
-          {state.pickDeadline && state.pickTimerSeconds > 0 && (
-            <div className="mt-3 max-w-xs mx-auto">
-              <CountdownTimer
-                deadline={state.pickDeadline}
-                onExpired={handleAutoPickExpired}
-              />
-            </div>
-          )}
         </div>
       ) : (
         <div className="rounded-2xl p-4 sm:p-5 text-center bg-green-900/20 border-2 border-green-500/50 glass-card">

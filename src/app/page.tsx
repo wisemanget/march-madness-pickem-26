@@ -99,8 +99,6 @@ export default function Home() {
   const statusLabel =
     state?.status === "complete"
       ? "Complete"
-      : state?.status === "waiting"
-      ? "Waiting for Players"
       : "Drafting";
 
   return (
@@ -135,30 +133,6 @@ export default function Home() {
             <p className="text-slate-400 text-sm">
               All {picksMade} teams have been picked.
             </p>
-          </div>
-        ) : state?.status === "waiting" ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse" />
-              <span className="text-yellow-400 font-bold">{statusLabel}</span>
-            </div>
-            <p className="text-slate-400 text-sm">
-              {state.readyParticipants.length} / {participants.length} ready
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {participants.map((name) => (
-                <span
-                  key={name}
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    state.readyParticipants.includes(name)
-                      ? "bg-green-900/40 text-green-400 border border-green-500/50"
-                      : "bg-slate-700/50 text-slate-500 border border-slate-600/50"
-                  }`}
-                >
-                  {name} {state.readyParticipants.includes(name) ? "✓" : "..."}
-                </span>
-              ))}
-            </div>
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">

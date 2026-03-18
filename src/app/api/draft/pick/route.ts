@@ -87,11 +87,6 @@ export async function POST(request: Request) {
 
     if (state.currentPickIndex >= totalPicks) {
       state.status = "complete";
-      state.pickDeadline = null;
-    } else if (state.pickTimerSeconds > 0) {
-      state.pickDeadline = new Date(
-        Date.now() + state.pickTimerSeconds * 1000
-      ).toISOString();
     }
 
     // Attempt to write with version check

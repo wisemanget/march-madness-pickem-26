@@ -129,13 +129,10 @@ async function setDraftStateIfVersion(
 
 export function getDefaultDraftState(): DraftState {
   return {
-    status: "waiting",
+    status: "drafting",
     picks: [],
     currentPickIndex: 0,
     version: 0,
-    pickTimerSeconds: 90,
-    pickDeadline: null,
-    readyParticipants: [],
     updatedAt: new Date().toISOString(),
   };
 }
