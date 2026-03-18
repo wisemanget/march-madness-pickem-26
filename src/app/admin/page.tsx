@@ -7,7 +7,71 @@ import { TEAMS } from "@/lib/teams";
 import { TournamentResults } from "@/lib/types";
 import TeamLogo from "@/components/TeamLogo";
 
-export default function AdminPage() {
+function AdminPinGate({ children }: { children: React.ReactNode }) {
+  const [pin, setPin] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("mm-admin-pin");
+    if (saved) {
+      verify(saved);
+    }
+  }, []);
+
+  const verify = async (p: string) => {
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPin: p }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAuthed(true);
+        sessionStorage.setItem("mm-admin-pin", p);
+        setError("");
+      } else {
+        setError("Incorrect admin PIN");
+        sessionStorage.removeItem("mm-admin-pin");
+      }
+    } catch {
+      setError("Verification failed");
+    }
+  };
+
+  if (authed) return <>{children}</>;
+
+  return (
+    <div className="max-w-sm mx-auto mt-20 glass-card rounded-2xl p-6 text-center animate-slide-up">
+      <span className="text-4xl block mb-4">🔒</span>
+      <h2 className="text-xl font-bold mb-2">Admin Access</h2>
+      <p className="text-slate-400 text-sm mb-4">Enter the admin PIN to continue.</p>
+      <div className="flex gap-2 justify-center">
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && verify(pin)}
+          placeholder="Admin PIN"
+          className="bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-white text-center tracking-widest focus:outline-none focus:border-amber-500/50 w-40"
+          autoFocus
+        />
+        <button
+          onClick={() => verify(pin)}
+          className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-lg transition"
+        >
+          Enter
+        </button>
+      </div>
+      {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+    </div>
+  );
+}
+
+function AdminContent() {
   const { state, refetch } = useDraftState();
   const { settings, refetch: refetchSettings } = useSettings();
   const [results, setResults] = useState<Record<string, number>>({});
@@ -21,6 +85,15 @@ export default function AdminPage() {
   const [newName, setNewName] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // PIN management
+  const [editPins, setEditPins] = useState<Record<string, string>>({});
+
+  // Timer config
+  const [timerSeconds, setTimerSeconds] = useState(90);
+
+  // Admin PIN change
+  const [newAdminPin, setNewAdminPin] = useState("");
+
   // Team reassignment
   const [reassignTeam, setReassignTeam] = useState("");
   const [reassignTo, setReassignTo] = useState("");
@@ -31,15 +104,26 @@ export default function AdminPage() {
   const [savingHistory, setSavingHistory] = useState(false);
 
   // Active tab
-  const [tab, setTab] = useState<"draft" | "participants" | "results" | "reassign" | "history">("draft");
+  const [tab, setTab] = useState<
+    "draft" | "participants" | "results" | "reassign" | "history" | "security"
+  >("draft");
 
   const participants = settings?.participants || [];
+  const adminPin = sessionStorage.getItem("mm-admin-pin") || "";
 
   useEffect(() => {
     if (settings) {
       setEditParticipants([...settings.participants]);
+      setEditPins({ ...(settings.participantPins || {}) });
+      setNewAdminPin("");
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (state?.pickTimerSeconds !== undefined) {
+      setTimerSeconds(state.pickTimerSeconds);
+    }
+  }, [state?.pickTimerSeconds]);
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -59,7 +143,11 @@ export default function AdminPage() {
   };
 
   const handleReset = async () => {
-    if (!confirm("Are you sure you want to reset the entire draft? This cannot be undone!")) {
+    if (
+      !confirm(
+        "Are you sure you want to reset the entire draft? This cannot be undone!"
+      )
+    ) {
       return;
     }
     setResetting(true);
@@ -71,6 +159,29 @@ export default function AdminPage() {
     await refetch();
     setResetting(false);
     showMsg("Draft has been reset!");
+  };
+
+  const handleConfigureTimer = async () => {
+    const res = await fetch("/api/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "configure-timer",
+        pickTimerSeconds: timerSeconds,
+        adminPin,
+      }),
+    });
+    if (res.ok) {
+      await refetch();
+      showMsg(
+        timerSeconds > 0
+          ? `Timer set to ${timerSeconds} seconds`
+          : "Timer disabled"
+      );
+    } else {
+      const err = await res.json();
+      showMsg(err.error || "Failed to configure timer", "error");
+    }
   };
 
   const handleWinChange = (teamName: string, wins: number) => {
@@ -104,7 +215,11 @@ export default function AdminPage() {
   };
 
   const removeParticipant = (index: number) => {
+    const name = editParticipants[index];
     setEditParticipants(editParticipants.filter((_, i) => i !== index));
+    const newPins = { ...editPins };
+    delete newPins[name];
+    setEditPins(newPins);
   };
 
   const moveParticipant = (index: number, direction: "up" | "down") => {
@@ -127,11 +242,17 @@ export default function AdminPage() {
       body: JSON.stringify({
         participants: editParticipants,
         year: settings?.year || new Date().getFullYear(),
+        participantPins: editPins,
+        newAdminPin: newAdminPin || undefined,
       }),
     });
     await refetchSettings();
     setSavingSettings(false);
-    showMsg("Participants saved!");
+    showMsg("Settings saved!");
+    if (newAdminPin) {
+      sessionStorage.setItem("mm-admin-pin", newAdminPin);
+      setNewAdminPin("");
+    }
   };
 
   // Team reassignment
@@ -189,6 +310,7 @@ export default function AdminPage() {
   const tabs = [
     { id: "draft" as const, label: "Draft Controls", icon: "🎮" },
     { id: "participants" as const, label: "Participants", icon: "👥" },
+    { id: "security" as const, label: "Security", icon: "🔒" },
     { id: "results" as const, label: "Results", icon: "📊" },
     { id: "reassign" as const, label: "Reassign Teams", icon: "🔄" },
     { id: "history" as const, label: "Save History", icon: "📚" },
@@ -232,32 +354,77 @@ export default function AdminPage() {
 
       {/* Draft Controls */}
       {tab === "draft" && (
-        <div className="glass-card rounded-2xl p-5 animate-slide-up">
-          <h2 className="font-semibold mb-3 text-lg flex items-center gap-2">
-            <span>🎮</span> Draft Controls
-          </h2>
-          <div className="flex items-center gap-4 mb-4 text-sm">
-            <span className="text-slate-400">
-              Status:{" "}
-              <span className={`font-bold ${state?.status === "complete" ? "text-green-400" : "text-amber-400"}`}>
-                {state?.status}
+        <div className="glass-card rounded-2xl p-5 animate-slide-up space-y-6">
+          <div>
+            <h2 className="font-semibold mb-3 text-lg flex items-center gap-2">
+              <span>🎮</span> Draft Controls
+            </h2>
+            <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
+              <span className="text-slate-400">
+                Status:{" "}
+                <span
+                  className={`font-bold ${
+                    state?.status === "complete"
+                      ? "text-green-400"
+                      : state?.status === "waiting"
+                      ? "text-yellow-400"
+                      : "text-amber-400"
+                  }`}
+                >
+                  {state?.status}
+                </span>
               </span>
-            </span>
-            <span className="text-slate-400">
-              Picks:{" "}
-              <span className="text-white font-bold">{state?.picks.length || 0}</span> / 64
-            </span>
+              <span className="text-slate-400">
+                Picks:{" "}
+                <span className="text-white font-bold">
+                  {state?.picks.length || 0}
+                </span>{" "}
+                / 64
+              </span>
+              <span className="text-slate-400">
+                Version:{" "}
+                <span className="text-white font-bold">
+                  {state?.version ?? 0}
+                </span>
+              </span>
+            </div>
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white px-6 py-3 rounded-xl transition font-bold hover-lift"
+            >
+              {resetting ? "Resetting..." : "🗑️ Reset Draft"}
+            </button>
+            <p className="text-xs text-slate-500 mt-2">
+              This clears all picks and resets to lobby (waiting) state.
+            </p>
           </div>
-          <button
-            onClick={handleReset}
-            disabled={resetting}
-            className="bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white px-6 py-3 rounded-xl transition font-bold hover-lift"
-          >
-            {resetting ? "Resetting..." : "🗑️ Reset Draft"}
-          </button>
-          <p className="text-xs text-slate-500 mt-2">
-            This clears all picks and starts a fresh draft.
-          </p>
+
+          {/* Timer Configuration */}
+          <div className="border-t border-slate-700/50 pt-5">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span>⏱️</span> Pick Timer
+            </h3>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={0}
+                max={600}
+                value={timerSeconds}
+                onChange={(e) =>
+                  setTimerSeconds(parseInt(e.target.value) || 0)
+                }
+                className="w-24 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-amber-500/50"
+              />
+              <span className="text-slate-400 text-sm">seconds (0 = disabled)</span>
+              <button
+                onClick={handleConfigureTimer}
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold px-4 py-2 rounded-lg transition"
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -268,7 +435,8 @@ export default function AdminPage() {
             <span>👥</span> Manage Participants
           </h2>
           <p className="text-sm text-slate-400 mb-4">
-            Add, remove, or reorder participants. The draft order follows this list (snake format).
+            Add, remove, or reorder participants. The draft order follows this
+            list (snake format).
           </p>
 
           <div className="space-y-2 mb-4">
@@ -277,7 +445,9 @@ export default function AdminPage() {
                 key={`${name}-${i}`}
                 className="flex items-center gap-2 bg-slate-700/30 rounded-xl px-4 py-2.5 group"
               >
-                <span className="text-amber-400 font-mono w-8 font-bold">{i + 1}.</span>
+                <span className="text-amber-400 font-mono w-8 font-bold">
+                  {i + 1}.
+                </span>
                 <span className="flex-1 font-medium">{name}</span>
                 <button
                   onClick={() => moveParticipant(i, "up")}
@@ -326,6 +496,70 @@ export default function AdminPage() {
             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
           >
             {savingSettings ? "Saving..." : "💾 Save Participants"}
+          </button>
+        </div>
+      )}
+
+      {/* Security / PIN Management */}
+      {tab === "security" && (
+        <div className="glass-card rounded-2xl p-5 animate-slide-up space-y-6">
+          <div>
+            <h2 className="font-semibold mb-3 text-lg flex items-center gap-2">
+              <span>🔒</span> PIN Management
+            </h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Assign 4-digit PINs to participants. Leave blank to allow login
+              without PIN.
+            </p>
+            <div className="space-y-2 mb-4">
+              {editParticipants.map((name) => (
+                <div
+                  key={name}
+                  className="flex items-center gap-3 bg-slate-700/30 rounded-xl px-4 py-2.5"
+                >
+                  <span className="font-medium flex-1 text-sm">{name}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={editPins[name] || ""}
+                    onChange={(e) =>
+                      setEditPins({
+                        ...editPins,
+                        [name]: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
+                    placeholder="PIN"
+                    className="w-20 bg-slate-700/50 border border-slate-600/50 rounded-lg px-2 py-1.5 text-white text-center tracking-widest text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-700/50 pt-5">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span>🔑</span> Admin PIN
+            </h3>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                value={newAdminPin}
+                onChange={(e) => setNewAdminPin(e.target.value)}
+                placeholder="New admin PIN (leave blank to keep current)"
+                className="flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={saveParticipants}
+            disabled={savingSettings}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
+          >
+            {savingSettings ? "Saving..." : "💾 Save Security Settings"}
           </button>
         </div>
       )}
@@ -380,7 +614,9 @@ export default function AdminPage() {
                         </span>
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleWinChange(team.name, wins - 1)}
+                            onClick={() =>
+                              handleWinChange(team.name, wins - 1)
+                            }
                             className="w-8 h-8 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-sm transition"
                           >
                             −
@@ -389,7 +625,9 @@ export default function AdminPage() {
                             {wins}
                           </span>
                           <button
-                            onClick={() => handleWinChange(team.name, wins + 1)}
+                            onClick={() =>
+                              handleWinChange(team.name, wins + 1)
+                            }
                             className="w-8 h-8 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-sm transition"
                           >
                             +
@@ -424,7 +662,9 @@ export default function AdminPage() {
           {state && state.picks.length > 0 ? (
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-slate-400 mb-1 block">Select Team</label>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Select Team
+                </label>
                 <select
                   value={reassignTeam}
                   onChange={(e) => setReassignTeam(e.target.value)}
@@ -435,14 +675,17 @@ export default function AdminPage() {
                     .sort((a, b) => a.team.name.localeCompare(b.team.name))
                     .map((pick) => (
                       <option key={pick.team.name} value={pick.team.name}>
-                        ({pick.team.seed}) {pick.team.name} — currently: {pick.participantName}
+                        ({pick.team.seed}) {pick.team.name} — currently:{" "}
+                        {pick.participantName}
                       </option>
                     ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-sm text-slate-400 mb-1 block">Assign To</label>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Assign To
+                </label>
                 <select
                   value={reassignTo}
                   onChange={(e) => setReassignTo(e.target.value)}
@@ -480,7 +723,7 @@ export default function AdminPage() {
             <span>📚</span> Save to History
           </h2>
           <p className="text-sm text-slate-400 mb-4">
-            Archive the current draft and results as a historical year, or save data from a previous year.
+            Archive the current draft and results as a historical year.
           </p>
 
           <div className="space-y-4">
@@ -489,13 +732,17 @@ export default function AdminPage() {
               <input
                 type="number"
                 value={histYear}
-                onChange={(e) => setHistYear(parseInt(e.target.value) || 2025)}
+                onChange={(e) =>
+                  setHistYear(parseInt(e.target.value) || 2025)
+                }
                 className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-amber-500/50"
               />
             </div>
 
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">Tournament Champion (optional)</label>
+              <label className="text-sm text-slate-400 mb-1 block">
+                Tournament Champion (optional)
+              </label>
               <input
                 type="text"
                 value={histChampion}
@@ -507,19 +754,31 @@ export default function AdminPage() {
 
             <button
               onClick={handleSaveToHistory}
-              disabled={savingHistory || !state || state.picks.length === 0}
+              disabled={
+                savingHistory || !state || state.picks.length === 0
+              }
               className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
             >
-              {savingHistory ? "Saving..." : "📚 Save Current Data to History"}
+              {savingHistory
+                ? "Saving..."
+                : "📚 Save Current Data to History"}
             </button>
 
             <p className="text-xs text-slate-500">
-              This saves the current participants, picks, and results under the specified year.
-              You can view historical data on the History page.
+              This saves the current participants, picks, and results under the
+              specified year.
             </p>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AdminPinGate>
+      <AdminContent />
+    </AdminPinGate>
   );
 }

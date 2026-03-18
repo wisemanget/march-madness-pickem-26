@@ -218,6 +218,26 @@ body::before {
   }
 }
 
+/* Pick enter animation */
+@keyframes pick-enter {
+  0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pick-enter {
+  animation: pick-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Your turn text flash */
+@keyframes turn-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; transform: scale(1.02); }
+}
+
+.your-turn-flash {
+  animation: turn-flash 1s ease-in-out infinite;
+}
+
 /* Prevent text selection on interactive elements */
 button, [role="button"] {
   -webkit-user-select: none;
