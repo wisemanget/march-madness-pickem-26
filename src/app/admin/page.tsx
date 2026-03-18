@@ -142,14 +142,24 @@ function AdminContent() {
       return;
     }
     setResetting(true);
-    await fetch("/api/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reset" }),
-    });
-    await refetch();
-    setResetting(false);
-    showMsg("Draft has been reset!");
+    try {
+      const res = await fetch("/api/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showMsg(err.error || `Reset failed (${res.status})`, "error");
+        return;
+      }
+      await refetch();
+      showMsg("Draft has been reset!");
+    } catch (e) {
+      showMsg(`Reset failed: ${e instanceof Error ? e.message : "network error"}`, "error");
+    } finally {
+      setResetting(false);
+    }
   };
 
   const handleWinChange = (teamName: string, wins: number) => {
