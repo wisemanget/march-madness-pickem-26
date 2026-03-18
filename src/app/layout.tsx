@@ -39,6 +39,7 @@ export default function RootLayout({
             {/* Desktop nav */}
             <div className="hidden sm:flex gap-1">
               <NavLink href="/draft">Draft</NavLink>
+              <NavLink href="/bracket">Bracket</NavLink>
               <NavLink href="/scores">Scores</NavLink>
               <NavLink href="/history">History</NavLink>
               <NavLink href="/import">Import</NavLink>
@@ -47,6 +48,7 @@ export default function RootLayout({
             {/* Mobile nav - horizontal scroll */}
             <div className="flex sm:hidden gap-0.5 overflow-x-auto no-scrollbar ml-2">
               <MobileNavLink href="/draft">Draft</MobileNavLink>
+              <MobileNavLink href="/bracket">Bracket</MobileNavLink>
               <MobileNavLink href="/scores">Scores</MobileNavLink>
               <MobileNavLink href="/history">History</MobileNavLink>
               <MobileNavLink href="/import">Import</MobileNavLink>
