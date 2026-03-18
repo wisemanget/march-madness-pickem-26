@@ -22,7 +22,7 @@ const ESPN_ROUND_MAP: Record<string, number> = {
   Championship: 6,
 };
 
-interface LiveOverlay {
+interface GameOverlay {
   topScore: number;
   bottomScore: number;
   status: "pre" | "in" | "post";
@@ -31,10 +31,10 @@ interface LiveOverlay {
   startTime: string;
 }
 
-function matchLiveOverlay(
+function matchGameOverlay(
   matchup: Matchup,
   games: LiveGame[]
-): LiveOverlay | undefined {
+): GameOverlay | undefined {
   if (!matchup.top || !matchup.bottom) return undefined;
 
   const game = games.find((g) => {
@@ -43,7 +43,6 @@ function matchLiveOverlay(
   });
   if (!game) return undefined;
 
-  // Figure out which game team maps to top/bottom
   const topIsHome = game.homeTeam.name === matchup.top.name;
   return {
     topScore: topIsHome ? game.homeTeam.score : game.awayTeam.score,
@@ -66,7 +65,7 @@ function detectCurrentRound(
       if (rnd) return rnd;
     }
   }
-  // If there are upcoming games today, show that round
+  // If there are upcoming games, show the earliest upcoming round
   for (const g of games) {
     if (g.status === "pre") {
       const rnd = ESPN_ROUND_MAP[g.round];
@@ -78,10 +77,52 @@ function detectCurrentRound(
     const roundMatchups = matchups.filter((m) => m.round === r);
     const hasDecided = roundMatchups.some((m) => m.winner);
     const hasUndecided = roundMatchups.some((m) => !m.winner);
-    if (hasDecided && hasUndecided) return r; // partially complete round
-    if (hasDecided && !hasUndecided && r < 6) return r + 1; // fully complete, show next
+    if (hasDecided && hasUndecided) return r;
+    if (hasDecided && !hasUndecided && r < 6) return r + 1;
   }
   return 1;
+}
+
+// ─── Date/Time Formatting ────────────────────────────────────────────────────
+
+function formatGameDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow =
+    d.getDate() === tomorrow.getDate() &&
+    d.getMonth() === tomorrow.getMonth() &&
+    d.getFullYear() === tomorrow.getFullYear();
+
+  const time = d.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  if (isToday) return `Today, ${time}`;
+  if (isTomorrow) return `Tomorrow, ${time}`;
+
+  const day = d.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  return `${day}, ${time}`;
+}
+
+function formatGameDateShort(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 // ─── Team Row ────────────────────────────────────────────────────────────────
@@ -158,19 +199,22 @@ function MatchupTeamRow({
 
 function MatchupCard({
   matchup,
-  live,
+  overlay,
 }: {
   matchup: Matchup;
-  live?: LiveOverlay;
+  overlay?: GameOverlay;
 }) {
-  const isLive = live?.status === "in";
-  const isFinal = live?.status === "post" || (!live && !!matchup.winner);
-  const isPre = live?.status === "pre";
-  const gameStarted = isLive || isFinal;
+  const isLive = overlay?.status === "in";
+  const isFinal = overlay?.status === "post" || (!overlay && !!matchup.winner);
+  const isPre = overlay?.status === "pre";
+  const gameStarted = isLive || (overlay?.status === "post");
 
-  // Determine winner display
-  const topWins = matchup.winner === "top" || (live?.status === "post" && (live.topScore > live.bottomScore));
-  const bottomWins = matchup.winner === "bottom" || (live?.status === "post" && (live.bottomScore > live.topScore));
+  const topWins =
+    matchup.winner === "top" ||
+    (overlay?.status === "post" && overlay.topScore > overlay.bottomScore);
+  const bottomWins =
+    matchup.winner === "bottom" ||
+    (overlay?.status === "post" && overlay.bottomScore > overlay.topScore);
 
   return (
     <div
@@ -184,7 +228,7 @@ function MatchupCard({
     >
       <MatchupTeamRow
         team={matchup.top}
-        score={live ? live.topScore : undefined}
+        score={overlay ? overlay.topScore : undefined}
         isWinner={topWins}
         isLoser={bottomWins}
         isLive={isLive}
@@ -195,39 +239,50 @@ function MatchupCard({
 
       <MatchupTeamRow
         team={matchup.bottom}
-        score={live ? live.bottomScore : undefined}
+        score={overlay ? overlay.bottomScore : undefined}
         isWinner={bottomWins}
         isLoser={topWins}
         isLive={isLive}
         gameStarted={gameStarted}
       />
 
-      {/* Status footer */}
-      <div className="px-3 py-1.5 border-t border-slate-700/20 flex items-center justify-between">
-        {isLive ? (
-          <span className="text-[10px] sm:text-xs font-bold text-green-400 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            {live?.statusDetail || "LIVE"}
-          </span>
-        ) : isFinal ? (
-          <span className="text-[10px] sm:text-xs font-bold text-slate-500">
-            FINAL
-          </span>
-        ) : isPre && live ? (
-          <span className="text-[10px] sm:text-xs text-slate-500">
-            {new Date(live.startTime).toLocaleTimeString([], {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </span>
-        ) : (
-          <span className="text-[10px] sm:text-xs text-slate-600 italic">
-            {matchup.top && matchup.bottom ? "Upcoming" : ""}
-          </span>
-        )}
-        {live?.broadcast && (
-          <span className="text-[9px] sm:text-[10px] text-slate-600">
-            {live.broadcast}
+      {/* Status footer with date/time */}
+      <div className="px-3 py-1.5 border-t border-slate-700/20 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {isLive ? (
+            <span className="text-[10px] sm:text-xs font-bold text-green-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+              {overlay?.statusDetail || "LIVE"}
+            </span>
+          ) : isFinal && overlay?.startTime ? (
+            <span className="text-[10px] sm:text-xs text-slate-500">
+              <span className="font-bold">FINAL</span>
+              <span className="mx-1 text-slate-600">&middot;</span>
+              {formatGameDateShort(overlay.startTime)}
+            </span>
+          ) : isFinal ? (
+            <span className="text-[10px] sm:text-xs font-bold text-slate-500">
+              FINAL
+            </span>
+          ) : isPre && overlay?.startTime ? (
+            <span className="text-[10px] sm:text-xs text-slate-400">
+              {formatGameDate(overlay.startTime)}
+            </span>
+          ) : overlay?.startTime ? (
+            <span className="text-[10px] sm:text-xs text-slate-500">
+              {formatGameDate(overlay.startTime)}
+            </span>
+          ) : matchup.top && matchup.bottom ? (
+            <span className="text-[10px] sm:text-xs text-slate-600 italic">
+              Time TBD
+            </span>
+          ) : (
+            <span />
+          )}
+        </div>
+        {overlay?.broadcast && (
+          <span className="text-[9px] sm:text-[10px] text-slate-600 shrink-0">
+            {overlay.broadcast}
           </span>
         )}
       </div>
@@ -241,6 +296,7 @@ export default function BracketPage() {
   const { state, loading } = useDraftState();
   const [results, setResults] = useState<TournamentResults | null>(null);
   const [liveGames, setLiveGames] = useState<LiveGame[]>([]);
+  const [scheduleGames, setScheduleGames] = useState<LiveGame[]>([]);
   const [selectedRound, setSelectedRound] = useState<number>(1);
   const [regionFilter, setRegionFilter] = useState<string>("All");
   const [syncing, setSyncing] = useState(false);
@@ -263,7 +319,23 @@ export default function BracketPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch live games (poll every 30s)
+  // Fetch full tournament schedule (poll every 2 min for game times across all dates)
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      try {
+        const res = await fetch("/api/scores/schedule");
+        const data = await res.json();
+        setScheduleGames(data.games || []);
+      } catch {
+        /* silent */
+      }
+    };
+    fetchSchedule();
+    const interval = setInterval(fetchSchedule, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch live games (poll every 30s for real-time scores of today's games)
   useEffect(() => {
     const fetchGames = async () => {
       try {
@@ -309,6 +381,10 @@ export default function BracketPage() {
       const data = await res.json();
       setResults(data.results);
       setLastSync(new Date().toLocaleTimeString());
+      // Also refresh schedule after sync
+      const schedRes = await fetch("/api/scores/schedule");
+      const schedData = await schedRes.json();
+      setScheduleGames(schedData.games || []);
     } catch {
       /* silent */
     } finally {
@@ -335,32 +411,54 @@ export default function BracketPage() {
     );
   }, [results, owners]);
 
+  // Merge schedule + live games, preferring live data for fresher scores.
+  // Live games (today only) override schedule entries for the same game.
+  const allGames = useMemo(() => {
+    const byId = new Map<string, LiveGame>();
+    // Start with schedule (all dates)
+    for (const g of scheduleGames) {
+      byId.set(g.id, g);
+    }
+    // Override with live games (more current for today's games)
+    for (const g of liveGames) {
+      byId.set(g.id, g);
+    }
+    return Array.from(byId.values());
+  }, [scheduleGames, liveGames]);
+
   // Auto-detect current round on first load
   useEffect(() => {
-    if (!roundAutoDetected && bracket.length > 0) {
-      const detected = detectCurrentRound(bracket, liveGames);
+    if (!roundAutoDetected && bracket.length > 0 && allGames.length > 0) {
+      const detected = detectCurrentRound(bracket, allGames);
       setSelectedRound(detected);
       setRoundAutoDetected(true);
     }
-  }, [bracket, liveGames, roundAutoDetected]);
+  }, [bracket, allGames, roundAutoDetected]);
 
-  // Build live game overlay map
-  const liveOverlays = useMemo(() => {
-    const map = new Map<string, LiveOverlay>();
+  // Also auto-detect when no schedule data but bracket is ready
+  useEffect(() => {
+    if (!roundAutoDetected && bracket.length > 0 && scheduleGames.length === 0 && liveGames.length === 0) {
+      // No ESPN data yet - detect from bracket state alone
+      const detected = detectCurrentRound(bracket, []);
+      setSelectedRound(detected);
+      setRoundAutoDetected(true);
+    }
+  }, [bracket, scheduleGames, liveGames, roundAutoDetected]);
+
+  // Build game overlay map for each bracket matchup
+  const overlays = useMemo(() => {
+    const map = new Map<string, GameOverlay>();
     for (const m of bracket) {
-      const overlay = matchLiveOverlay(m, liveGames);
+      const overlay = matchGameOverlay(m, allGames);
       if (overlay) map.set(m.id, overlay);
     }
     return map;
-  }, [bracket, liveGames]);
+  }, [bracket, allGames]);
 
   // Filter matchups for display
   const displayMatchups = useMemo(() => {
     let filtered = bracket.filter((m) => m.round === selectedRound);
-    if (
-      selectedRound <= 4 &&
-      regionFilter !== "All"
-    ) {
+    if (selectedRound <= 4 && regionFilter !== "All") {
       filtered = filtered.filter((m) => m.region === regionFilter);
     }
     return filtered;
@@ -368,15 +466,20 @@ export default function BracketPage() {
 
   // Count decided matchups per round
   const roundStats = useMemo(() => {
-    const stats: Record<number, { decided: number; total: number; live: number }> = {};
+    const stats: Record<
+      number,
+      { decided: number; total: number; live: number }
+    > = {};
     for (const r of ROUNDS) {
       const roundMatchups = bracket.filter((m) => m.round === r.num);
       const decided = roundMatchups.filter((m) => m.winner).length;
-      const live = roundMatchups.filter((m) => liveOverlays.get(m.id)?.status === "in").length;
+      const live = roundMatchups.filter(
+        (m) => overlays.get(m.id)?.status === "in"
+      ).length;
       stats[r.num] = { decided, total: r.games, live };
     }
     return stats;
-  }, [bracket, liveOverlays]);
+  }, [bracket, overlays]);
 
   // Live game count
   const liveCount = liveGames.filter((g) => g.status === "in").length;
@@ -384,10 +487,9 @@ export default function BracketPage() {
   // Group matchups by region for display
   const groupedMatchups = useMemo(() => {
     if (selectedRound >= 5) {
-      // Final Four and Championship - no region grouping
-      return [{ region: undefined, matchups: displayMatchups }];
+      return [{ region: undefined as string | undefined, matchups: displayMatchups }];
     }
-    const groups: { region: string; matchups: Matchup[] }[] = [];
+    const groups: { region: string | undefined; matchups: Matchup[] }[] = [];
     for (const region of REGION_NAMES) {
       const regionMatchups = displayMatchups.filter(
         (m) => m.region === region
@@ -511,7 +613,10 @@ export default function BracketPage() {
       )}
 
       {/* Matchups */}
-      <div className="space-y-5 animate-slide-up" style={{ animationDelay: "150ms" }}>
+      <div
+        className="space-y-5 animate-slide-up"
+        style={{ animationDelay: "150ms" }}
+      >
         {groupedMatchups.map((group) => (
           <div key={group.region || "finals"}>
             {group.region && regionFilter === "All" && (
@@ -524,7 +629,7 @@ export default function BracketPage() {
                 <MatchupCard
                   key={m.id}
                   matchup={m}
-                  live={liveOverlays.get(m.id)}
+                  overlay={overlays.get(m.id)}
                 />
               ))}
             </div>
@@ -558,7 +663,11 @@ export default function BracketPage() {
                 (m) => m.round === 4 && m.region === region
               );
               const champ =
-                e8?.winner === "top" ? e8.top : e8?.winner === "bottom" ? e8.bottom : null;
+                e8?.winner === "top"
+                  ? e8.top
+                  : e8?.winner === "bottom"
+                  ? e8.bottom
+                  : null;
               return (
                 <div
                   key={region}
