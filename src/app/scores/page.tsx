@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { TournamentResults } from "@/lib/types";
-import { calculateTeamPoints, POINTS_PER_WIN } from "@/lib/scoring";
+import { calculateTeamPoints } from "@/lib/scoring";
 
 const REGION_STRIPE: Record<string, string> = {
   East: "region-east",
@@ -103,23 +103,12 @@ export default function ScoresPage() {
         <h2 className="font-semibold mb-2 flex items-center gap-2">
           <span>📊</span> Scoring System
         </h2>
-        <div className="flex gap-3 text-sm flex-wrap">
-          {[
-            "Round of 64",
-            "Round of 32",
-            "Sweet 16",
-            "Elite 8",
-            "Final Four",
-            "Championship",
-          ].map((round, i) => (
-            <span
-              key={round}
-              className="bg-slate-700/50 px-3 py-1.5 rounded-lg"
-            >
-              <span className="text-slate-400">{round}:</span>{" "}
-              <span className="text-amber-400 font-bold">{POINTS_PER_WIN[i]}pt</span>
-            </span>
-          ))}
+        <div className="flex gap-3 text-sm flex-wrap items-center">
+          <span className="bg-slate-700/50 px-4 py-2 rounded-lg">
+            <span className="text-amber-400 font-bold text-lg">1 point</span>{" "}
+            <span className="text-slate-400">per tournament win</span>
+          </span>
+          <span className="text-slate-500">Max 6 points per team (6 wins = champion)</span>
         </div>
       </div>
 
