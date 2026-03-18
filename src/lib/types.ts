@@ -12,9 +12,13 @@ export interface Pick {
 }
 
 export interface DraftState {
-  status: "drafting" | "complete";
+  status: "waiting" | "drafting" | "complete";
   picks: Pick[];
   currentPickIndex: number;
+  version: number;
+  pickTimerSeconds: number;
+  pickDeadline: string | null;
+  readyParticipants: string[];
   updatedAt: string;
 }
 
@@ -26,7 +30,9 @@ export interface TournamentResults {
 export interface AppSettings {
   participants: string[];
   year: number;
-  draftOrderSeed: number[]; // indices into participants array for custom order
+  draftOrderSeed: number[];
+  participantPins: Record<string, string>;
+  adminPin: string;
   updatedAt: string;
 }
 

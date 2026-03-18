@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { store, getDefaultDraftState } from "@/lib/store";
+import { triggerDraftEvent } from "@/lib/pusher";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -26,9 +27,11 @@ export async function POST(request: Request) {
   }
 
   state.picks[pickIndex].participantName = newOwner;
+  state.version = (state.version ?? 0) + 1;
   state.updatedAt = new Date().toISOString();
 
   await store.setDraftState(state);
+  await triggerDraftEvent("draft-updated", state);
 
   return NextResponse.json(state);
 }

@@ -18,7 +18,6 @@ function ensureDataDir() {
 }
 
 function keyToFilename(key: string): string {
-  // Replace colons with double underscores for filesystem safety
   return key.replace(/:/g, "__") + ".json";
 }
 
@@ -53,8 +52,23 @@ function fileDelete(key: string): void {
   }
 }
 
+function isKVConfigured(): boolean {
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+}
+
+// Fail loudly in production if KV is not configured
+function assertKVInProduction(): void {
+  if (process.env.NODE_ENV === "production" && !isKVConfigured()) {
+    throw new Error(
+      "KV_REST_API_URL and KV_REST_API_TOKEN must be set in production. " +
+      "Configure Vercel KV (Upstash Redis) in your Vercel project settings."
+    );
+  }
+}
+
 async function getKV<T>(key: string): Promise<T | null> {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  assertKVInProduction();
+  if (isKVConfigured()) {
     const { kv } = await import("@vercel/kv");
     return kv.get<T>(key);
   }
@@ -62,7 +76,8 @@ async function getKV<T>(key: string): Promise<T | null> {
 }
 
 async function setKV<T>(key: string, value: T): Promise<void> {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  assertKVInProduction();
+  if (isKVConfigured()) {
     const { kv } = await import("@vercel/kv");
     await kv.set(key, value);
   } else {
@@ -71,7 +86,8 @@ async function setKV<T>(key: string, value: T): Promise<void> {
 }
 
 async function deleteKV(key: string): Promise<void> {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  assertKVInProduction();
+  if (isKVConfigured()) {
     const { kv } = await import("@vercel/kv");
     await kv.del(key);
   } else {
@@ -79,11 +95,47 @@ async function deleteKV(key: string): Promise<void> {
   }
 }
 
+/**
+ * Optimistic locking: set draft state only if version matches.
+ * Returns true if write succeeded, false if version mismatch.
+ */
+async function setDraftStateIfVersion(
+  state: DraftState,
+  expectedVersion: number
+): Promise<boolean> {
+  assertKVInProduction();
+
+  if (isKVConfigured()) {
+    // For KV, use a simple read-check-write pattern
+    // (In a high-concurrency scenario, you'd use a Lua script, but
+    // for 8 friends this is sufficient)
+    const { kv } = await import("@vercel/kv");
+    const current = await kv.get<DraftState>(DRAFT_KEY);
+    if (current && current.version !== expectedVersion) {
+      return false;
+    }
+    await kv.set(DRAFT_KEY, state);
+    return true;
+  }
+
+  // File-based: simple version check
+  const current = fileGet<DraftState>(DRAFT_KEY);
+  if (current && current.version !== expectedVersion) {
+    return false;
+  }
+  fileSet(DRAFT_KEY, state);
+  return true;
+}
+
 export function getDefaultDraftState(): DraftState {
   return {
-    status: "drafting",
+    status: "waiting",
     picks: [],
     currentPickIndex: 0,
+    version: 0,
+    pickTimerSeconds: 90,
+    pickDeadline: null,
+    readyParticipants: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -93,13 +145,23 @@ export function getDefaultSettings(): AppSettings {
     participants: [...DEFAULT_PARTICIPANTS],
     year: new Date().getFullYear(),
     draftOrderSeed: DEFAULT_PARTICIPANTS.map((_, i) => i),
+    participantPins: {},
+    adminPin: "1234",
     updatedAt: new Date().toISOString(),
+  };
+}
+
+export function isKVHealthy(): { configured: boolean; production: boolean } {
+  return {
+    configured: isKVConfigured(),
+    production: process.env.NODE_ENV === "production",
   };
 }
 
 export const store = {
   getDraftState: () => getKV<DraftState>(DRAFT_KEY),
   setDraftState: (state: DraftState) => setKV(DRAFT_KEY, state),
+  setDraftStateIfVersion,
   getResults: () => getKV<TournamentResults>(RESULTS_KEY),
   setResults: (results: TournamentResults) => setKV(RESULTS_KEY, results),
 
