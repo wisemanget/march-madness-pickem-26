@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { TEAMS } from "@/lib/teams";
 import { TournamentResults } from "@/lib/types";
 import TeamLogo from "@/components/TeamLogo";
+import ConfirmModal from "@/components/ConfirmModal";
 
 function AdminPinGate({ children }: { children: React.ReactNode }) {
   const [pin, setPin] = useState("");
@@ -77,6 +78,7 @@ function AdminContent() {
   const [results, setResults] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
 
@@ -133,14 +135,8 @@ function AdminContent() {
     setTimeout(() => setMessage(""), 4000);
   };
 
-  const handleReset = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to reset the entire draft? This cannot be undone!"
-      )
-    ) {
-      return;
-    }
+  const doReset = useCallback(async () => {
+    setConfirmReset(false);
     setResetting(true);
     try {
       const res = await fetch("/api/draft", {
@@ -160,7 +156,7 @@ function AdminContent() {
     } finally {
       setResetting(false);
     }
-  };
+  }, [refetch]);
 
   const handleWinChange = (teamName: string, wins: number) => {
     setResults((prev) => ({
@@ -365,7 +361,7 @@ function AdminContent() {
               </span>
             </div>
             <button
-              onClick={handleReset}
+              onClick={() => setConfirmReset(true)}
               disabled={resetting}
               className="bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white px-6 py-3 rounded-xl transition font-bold hover-lift"
             >
@@ -721,6 +717,16 @@ function AdminContent() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmReset}
+        title="Reset Draft"
+        message="Are you sure you want to reset the entire draft? This cannot be undone!"
+        confirmLabel="Reset Draft"
+        danger
+        onConfirm={doReset}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   );
 }

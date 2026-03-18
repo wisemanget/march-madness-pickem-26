@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -13,6 +13,7 @@ import {
   generateDraftOrder,
 } from "@/lib/draft-order";
 import TeamLogo from "@/components/TeamLogo";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const REGION_COLORS: Record<string, string> = {
   East: "bg-blue-900/40 border-blue-500/50",
@@ -82,6 +83,7 @@ export default function DraftPage() {
   const [regionFilter, setRegionFilter] = useState<string>("All");
   const [showConfetti, setShowConfetti] = useState(false);
   const [lastPickCount, setLastPickCount] = useState(0);
+  const [confirmUndo, setConfirmUndo] = useState(false);
 
   const participants = settings?.participants || [];
 
@@ -160,8 +162,8 @@ export default function DraftPage() {
     }
   };
 
-  const handleUndo = async () => {
-    if (!confirm("Undo the last pick?")) return;
+  const doUndo = useCallback(async () => {
+    setConfirmUndo(false);
     const adminPin = sessionStorage.getItem("mm-admin-pin");
     const res = await fetch("/api/draft/undo", {
       method: "POST",
@@ -177,7 +179,7 @@ export default function DraftPage() {
       alert(err.error || "Failed to undo");
     }
     await refetch();
-  };
+  }, [myName, myPin, refetch]);
 
   if (loading || settingsLoading || !state) {
     return (
@@ -289,7 +291,7 @@ export default function DraftPage() {
       {state.status === "drafting" && state.picks.length > 0 && (
         <div className="flex justify-end">
           <button
-            onClick={handleUndo}
+            onClick={() => setConfirmUndo(true)}
             className="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition"
           >
             ↩ Undo Last Pick
@@ -519,6 +521,15 @@ export default function DraftPage() {
           )}
         </div>
       )}
+      <ConfirmModal
+        open={confirmUndo}
+        title="Undo Last Pick"
+        message="Are you sure you want to undo the last pick?"
+        confirmLabel="Undo"
+        danger
+        onConfirm={doUndo}
+        onCancel={() => setConfirmUndo(false)}
+      />
     </div>
   );
 }
