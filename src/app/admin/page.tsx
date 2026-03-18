@@ -5,6 +5,7 @@ import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { TEAMS } from "@/lib/teams";
 import { TournamentResults } from "@/lib/types";
+import TeamLogo from "@/components/TeamLogo";
 
 export default function AdminPage() {
   const { state, refetch } = useDraftState();
@@ -213,12 +214,12 @@ export default function AdminPage() {
       )}
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
               tab === t.id
                 ? "bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-lg shadow-amber-500/20"
                 : "glass-card text-slate-300 hover:text-white"
@@ -370,7 +371,8 @@ export default function AdminPage() {
                           wins > 0 ? "border-l-4 border-amber-500/50" : ""
                         }`}
                       >
-                        <span className="text-sm">
+                        <span className="text-sm flex items-center gap-2">
+                          <TeamLogo teamName={team.name} size="xs" />
                           <span className="text-amber-400 font-mono mr-1">
                             ({team.seed})
                           </span>

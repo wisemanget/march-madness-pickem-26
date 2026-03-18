@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { TEAMS } from "@/lib/teams";
@@ -11,6 +11,7 @@ import {
   getPickInRound,
   generateDraftOrder,
 } from "@/lib/draft-order";
+import TeamLogo from "@/components/TeamLogo";
 
 const REGION_COLORS: Record<string, string> = {
   East: "bg-blue-900/40 border-blue-500/50",
@@ -24,13 +25,6 @@ const REGION_TEXT: Record<string, string> = {
   South: "text-red-400",
   Midwest: "text-purple-400",
   West: "text-green-400",
-};
-
-const REGION_BADGE: Record<string, string> = {
-  East: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  South: "bg-red-500/20 text-red-300 border-red-500/30",
-  Midwest: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  West: "bg-green-500/20 text-green-300 border-green-500/30",
 };
 
 function seedColor(seed: number) {
@@ -86,7 +80,6 @@ export default function DraftPage() {
     if (saved) setMyName(saved);
   }, []);
 
-  // Confetti on new pick
   useEffect(() => {
     if (state && state.picks.length > lastPickCount && lastPickCount > 0) {
       setShowConfetti(true);
@@ -135,7 +128,7 @@ export default function DraftPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <span className="text-5xl animate-float inline-block">🏀</span>
-          <div className="text-2xl text-slate-400 animate-pulse mt-4">Loading draft...</div>
+          <div className="text-xl sm:text-2xl text-slate-400 animate-pulse mt-4">Loading draft...</div>
         </div>
       </div>
     );
@@ -149,7 +142,6 @@ export default function DraftPage() {
   const isMyTurn = myName === currentDrafter && state.status === "drafting";
   const rounds = n > 0 ? Math.ceil(totalPicks / n) : 0;
 
-  // Get column headers for each round (accounts for snake order)
   const getColumnHeaders = (round: number) => {
     const names = [...participants];
     if (round % 2 === 1) names.reverse();
@@ -157,13 +149,13 @@ export default function DraftPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {showConfetti && <Confetti />}
 
       {/* Current Pick Banner */}
       {state.status === "drafting" ? (
         <div
-          className={`rounded-2xl p-5 text-center border-2 transition-all ${
+          className={`rounded-2xl p-4 sm:p-5 text-center border-2 transition-all ${
             isMyTurn
               ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-400 your-turn-pulse"
               : "glass-card border-slate-700/50"
@@ -171,24 +163,23 @@ export default function DraftPage() {
         >
           {isMyTurn ? (
             <div className="animate-bounce-in">
-              <p className="text-amber-400 text-3xl font-extrabold animate-pulse">
+              <p className="text-amber-400 text-2xl sm:text-3xl font-extrabold animate-pulse">
                 🏀 YOUR TURN! 🏀
               </p>
-              <p className="text-slate-300 mt-1">
+              <p className="text-slate-300 mt-1 text-sm sm:text-base">
                 Round {currentRound}, Pick {pickInRound} — Select a team below
               </p>
             </div>
           ) : (
             <div>
-              <p className="text-xl">
+              <p className="text-lg sm:text-xl">
                 <span className="text-white font-bold">{currentDrafter}</span>
                 <span className="text-slate-400"> is on the clock</span>
               </p>
-              <p className="text-slate-500 text-sm">
+              <p className="text-slate-500 text-xs sm:text-sm">
                 Round {currentRound}, Pick {pickInRound} (Overall #{state.currentPickIndex + 1})
               </p>
-              {/* Mini progress */}
-              <div className="w-48 mx-auto mt-3 bg-slate-700 rounded-full h-2 overflow-hidden">
+              <div className="w-32 sm:w-48 mx-auto mt-3 bg-slate-700 rounded-full h-2 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
                   style={{ width: `${(state.picks.length / totalPicks) * 100}%` }}
@@ -198,32 +189,34 @@ export default function DraftPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-2xl p-5 text-center bg-green-900/20 border-2 border-green-500/50 glass-card">
-          <span className="text-4xl trophy-spin inline-block cursor-pointer">🏆</span>
-          <p className="text-green-400 text-2xl font-bold mt-2">Draft Complete!</p>
+        <div className="rounded-2xl p-4 sm:p-5 text-center bg-green-900/20 border-2 border-green-500/50 glass-card">
+          <span className="text-3xl sm:text-4xl trophy-spin inline-block cursor-pointer">🏆</span>
+          <p className="text-green-400 text-xl sm:text-2xl font-bold mt-2">Draft Complete!</p>
         </div>
       )}
 
       {!myName && state.status === "drafting" && (
-        <div className="glass-card border border-yellow-600/50 rounded-xl p-3 text-center text-yellow-300">
+        <div className="glass-card border border-yellow-600/50 rounded-xl p-3 text-center text-yellow-300 text-sm">
           <a href="/" className="underline font-medium">Go to home page</a> to select who you are before making picks.
         </div>
       )}
 
-      {/* Draft Board */}
+      {/* Draft Board - mobile: card view, desktop: table */}
       <div className="glass-card rounded-2xl overflow-hidden">
-        <h2 className="text-lg font-semibold p-4 border-b border-slate-700/50 flex items-center gap-2">
+        <h2 className="text-base sm:text-lg font-semibold p-3 sm:p-4 border-b border-slate-700/50 flex items-center gap-2">
           <span>📋</span> Draft Board
         </h2>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table view */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700/50">
-                <th className="p-2 text-left text-slate-500 w-16">Rd</th>
+                <th className="p-2 text-left text-slate-500 w-12">Rd</th>
                 {participants.map((name) => (
                   <th
                     key={name}
-                    className={`p-2 text-center min-w-[110px] ${
+                    className={`p-2 text-center min-w-[120px] ${
                       name === currentDrafter && state.status === "drafting"
                         ? "text-amber-400 font-bold"
                         : "text-slate-300"
@@ -247,32 +240,30 @@ export default function DraftPage() {
                       const pickIndex = round * n + headers.indexOf(name);
                       const pick = state.picks[pickIndex] || null;
                       const isCurrentPick =
-                        state.status === "drafting" &&
-                        pickIndex === state.currentPickIndex;
+                        state.status === "drafting" && pickIndex === state.currentPickIndex;
 
                       return (
                         <td
                           key={`${round}-${name}`}
                           className={`p-1 text-center ${
-                            isCurrentPick
-                              ? "bg-amber-500/20 ring-2 ring-amber-400/50 ring-inset rounded"
-                              : ""
+                            isCurrentPick ? "bg-amber-500/20 ring-2 ring-amber-400/50 ring-inset rounded" : ""
                           }`}
                         >
                           {pick ? (
                             <div
-                              className={`rounded-lg px-2 py-1.5 text-xs border transition-all hover-lift ${
+                              className={`rounded-lg px-2 py-1.5 text-xs border flex items-center gap-1.5 justify-center ${
                                 REGION_COLORS[pick.team.region]
                               }`}
                             >
+                              <TeamLogo teamName={pick.team.name} size="xs" />
                               <span
-                                className={`inline-block w-5 h-5 rounded-full text-[10px] font-bold leading-5 text-center mr-1 ${seedColor(
+                                className={`inline-block w-4 h-4 rounded-full text-[9px] font-bold leading-4 text-center shrink-0 ${seedColor(
                                   pick.team.seed
                                 )}`}
                               >
                                 {pick.team.seed}
                               </span>
-                              <span className="font-medium">{pick.team.name}</span>
+                              <span className="font-medium truncate">{pick.team.name}</span>
                             </div>
                           ) : (
                             <span className="text-slate-700">—</span>
@@ -286,24 +277,66 @@ export default function DraftPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card view - grouped by participant */}
+        <div className="sm:hidden p-3 space-y-3">
+          {participants.map((name) => {
+            const myPicks = state.picks.filter((p) => p.participantName === name);
+            return (
+              <div key={name} className="bg-slate-800/50 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`font-bold text-sm ${
+                    name === currentDrafter && state.status === "drafting"
+                      ? "text-amber-400"
+                      : "text-white"
+                  }`}>
+                    {name}
+                    {name === myName && <span className="text-green-400 text-[10px] ml-1">(you)</span>}
+                  </span>
+                  <span className="text-xs text-slate-500">{myPicks.length} picks</span>
+                </div>
+                {myPicks.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {myPicks.map((pick) => (
+                      <div
+                        key={pick.team.name}
+                        className={`rounded-lg px-2 py-1.5 text-xs border flex items-center gap-1.5 ${
+                          REGION_COLORS[pick.team.region]
+                        }`}
+                      >
+                        <TeamLogo teamName={pick.team.name} size="xs" />
+                        <span className={`w-4 h-4 rounded-full text-[9px] font-bold leading-4 text-center shrink-0 ${seedColor(pick.team.seed)}`}>
+                          {pick.team.seed}
+                        </span>
+                        <span className="font-medium truncate">{pick.team.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-600">No picks yet</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Team Picker */}
       {state.status === "drafting" && (
-        <div className="glass-card rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <span>🎯</span> Available Teams ({availableTeams.length})
+        <div className="glass-card rounded-2xl p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+              <span>🎯</span> Available ({availableTeams.length})
             </h2>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
               {["All", "East", "South", "Midwest", "West"].map((region) => (
                 <button
                   key={region}
                   onClick={() => setRegionFilter(region)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition font-medium ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm transition font-medium whitespace-nowrap ${
                     regionFilter === region
                       ? "bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold shadow-lg shadow-amber-500/20"
-                      : "bg-slate-700/50 text-slate-300 hover:bg-slate-600/50"
+                      : "bg-slate-700/50 text-slate-300"
                   }`}
                 >
                   {region}
@@ -312,7 +345,7 @@ export default function DraftPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
             {filteredTeams
               .sort((a, b) => a.seed - b.seed || a.region.localeCompare(b.region))
               .map((team) => (
@@ -320,33 +353,38 @@ export default function DraftPage() {
                   key={team.name}
                   disabled={!isMyTurn || picking}
                   onClick={() => handlePick(team)}
-                  className={`rounded-xl p-2.5 text-left border transition-all ${
+                  className={`rounded-xl p-2 sm:p-2.5 text-left border transition-all ${
                     REGION_COLORS[team.region]
                   } ${
                     isMyTurn && !picking
-                      ? "hover:ring-2 hover:ring-amber-400 cursor-pointer hover:scale-105 hover:shadow-lg hover:shadow-amber-500/10 active:scale-95"
+                      ? "active:scale-95 cursor-pointer sm:hover:ring-2 sm:hover:ring-amber-400 sm:hover:scale-105"
                       : "opacity-50 cursor-not-allowed"
                   }`}
                 >
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`inline-block w-5 h-5 rounded-full text-[10px] font-bold leading-5 text-center shrink-0 ${seedColor(
-                        team.seed
-                      )}`}
-                    >
-                      {team.seed}
-                    </span>
-                    <span className="text-xs font-medium truncate">{team.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <TeamLogo teamName={team.name} size="sm" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`inline-block w-4 h-4 rounded-full text-[9px] font-bold leading-4 text-center shrink-0 ${seedColor(
+                            team.seed
+                          )}`}
+                        >
+                          {team.seed}
+                        </span>
+                        <span className="text-xs font-medium truncate">{team.name}</span>
+                      </div>
+                      <span className={`text-[10px] ${REGION_TEXT[team.region]}`}>
+                        {team.region}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`text-[10px] ${REGION_TEXT[team.region]}`}>
-                    {team.region}
-                  </span>
                 </button>
               ))}
           </div>
 
           {isMyTurn && (
-            <p className="text-center text-amber-400/60 text-sm mt-4 animate-pulse">
+            <p className="text-center text-amber-400/60 text-xs sm:text-sm mt-3 sm:mt-4 animate-pulse">
               Tap a team to draft them!
             </p>
           )}

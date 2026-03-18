@@ -189,3 +189,38 @@ body::before {
 .region-south { border-left: 4px solid #ef4444; }
 .region-midwest { border-left: 4px solid #a855f7; }
 .region-west { border-left: 4px solid #22c55e; }
+
+/* Hide scrollbar but allow scrolling */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Touch-friendly tap targets */
+@media (max-width: 640px) {
+  button, a { min-height: 44px; }
+  .glass-card { border-radius: 1rem; }
+
+  /* Disable hover lift on mobile (causes sticky hover) */
+  .hover-lift:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .hover-lift:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Safe area padding for notched phones */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent text selection on interactive elements */
+button, [role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
