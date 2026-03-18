@@ -23,7 +23,25 @@ export interface TournamentResults {
   updatedAt: string;
 }
 
-export const PARTICIPANTS = [
+export interface AppSettings {
+  participants: string[];
+  year: number;
+  draftOrderSeed: number[]; // indices into participants array for custom order
+  updatedAt: string;
+}
+
+export interface HistoricalYear {
+  year: number;
+  participants: string[];
+  picks: Pick[];
+  results: TournamentResults;
+  teams: Team[];
+  champion?: string;
+  updatedAt: string;
+}
+
+// Default participants - can be customized via admin
+export const DEFAULT_PARTICIPANTS = [
   "Luke",
   "Alex H.",
   "Ryan",
@@ -32,6 +50,6 @@ export const PARTICIPANTS = [
   "Chris S.",
   "Nick S.",
   "Carlson",
-] as const;
+];
 
-export type ParticipantName = (typeof PARTICIPANTS)[number];
+export type ParticipantName = string;

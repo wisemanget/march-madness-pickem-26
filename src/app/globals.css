@@ -3,15 +3,189 @@
 @tailwind utilities;
 
 body {
-  background: #0f172a;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  background-attachment: fixed;
   color: #e2e8f0;
 }
 
+/* Basketball court pattern overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 30%, rgba(15, 23, 42, 0.3) 31%),
+    radial-gradient(circle at 50% 50%, transparent 60%, rgba(15, 23, 42, 0.1) 61%);
+  background-size: 100% 100%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+/* Pulsing border for your turn */
 @keyframes pulse-border {
-  0%, 100% { border-color: #f59e0b; }
-  50% { border-color: #f97316; }
+  0%, 100% { border-color: #f59e0b; box-shadow: 0 0 15px rgba(245, 158, 11, 0.3); }
+  50% { border-color: #f97316; box-shadow: 0 0 30px rgba(249, 115, 22, 0.5); }
 }
 
 .your-turn-pulse {
   animation: pulse-border 1.5s ease-in-out infinite;
 }
+
+/* Card hover effect */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Confetti burst */
+@keyframes confetti-fall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  top: -10px;
+  z-index: 999;
+  animation: confetti-fall 3s ease-in forwards;
+}
+
+/* Slide-in animation for cards */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+/* Stagger children */
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+/* Bounce in for picks */
+@keyframes bounce-in {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+/* Glow effect for leader */
+@keyframes leader-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.6); }
+}
+
+.leader-glow {
+  animation: leader-glow 2s ease-in-out infinite;
+}
+
+/* Trophy spin */
+@keyframes trophy-spin {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.trophy-spin:hover {
+  animation: trophy-spin 1s ease-in-out;
+}
+
+/* Progress bar fill */
+@keyframes fill-bar {
+  from { width: 0%; }
+}
+
+.animate-fill {
+  animation: fill-bar 1s ease-out forwards;
+}
+
+/* Floating basketball */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-10px) rotate(5deg); }
+  75% { transform: translateY(5px) rotate(-3deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Team card pick animation */
+@keyframes pick-flash {
+  0% { background: rgba(245, 158, 11, 0.5); transform: scale(1.1); }
+  100% { background: transparent; transform: scale(1); }
+}
+
+.pick-flash {
+  animation: pick-flash 0.6s ease-out;
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #f59e0b, #f97316, #ef4444);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Hover lift */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Rank badge styles */
+.rank-gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #000; }
+.rank-silver { background: linear-gradient(135deg, #94a3b8, #cbd5e1); color: #000; }
+.rank-bronze { background: linear-gradient(135deg, #b45309, #d97706); color: #000; }
+
+/* Region stripe accents */
+.region-east { border-left: 4px solid #3b82f6; }
+.region-south { border-left: 4px solid #ef4444; }
+.region-midwest { border-left: 4px solid #a855f7; }
+.region-west { border-left: 4px solid #22c55e; }

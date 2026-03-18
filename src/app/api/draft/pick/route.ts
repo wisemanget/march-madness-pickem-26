@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { store, getDefaultDraftState } from "@/lib/store";
+import { store, getDefaultDraftState, getDefaultSettings } from "@/lib/store";
 import { TEAMS } from "@/lib/teams";
-import { DRAFT_ORDER } from "@/lib/draft-order";
+import { generateDraftOrder } from "@/lib/draft-order";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -26,8 +26,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Get dynamic participants
+  let settings = await store.getSettings();
+  if (!settings) settings = getDefaultSettings();
+  const participants = settings.participants;
+  const draftOrder = generateDraftOrder(participants);
+  const totalPicks = draftOrder.length;
+
   // Verify it's this participant's turn
-  const expectedDrafter = DRAFT_ORDER[state.currentPickIndex];
+  const expectedDrafter = draftOrder[state.currentPickIndex];
   if (participantName !== expectedDrafter) {
     return NextResponse.json(
       { error: `It's ${expectedDrafter}'s turn, not ${participantName}'s` },
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
   state.currentPickIndex++;
   state.updatedAt = new Date().toISOString();
 
-  if (state.currentPickIndex >= 64) {
+  if (state.currentPickIndex >= totalPicks) {
     state.status = "complete";
   }
 

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PARTICIPANTS } from "@/lib/types";
+import { useSettings } from "@/hooks/useSettings";
 import { useDraftState } from "@/hooks/useDraftState";
 import { getCurrentDrafter } from "@/lib/draft-order";
 
 export default function Home() {
-  const { state, loading } = useDraftState();
+  const { state, loading: draftLoading } = useDraftState();
+  const { settings, loading: settingsLoading } = useSettings();
   const [selectedName, setSelectedName] = useState<string>("");
 
   useEffect(() => {
@@ -19,104 +20,154 @@ export default function Home() {
     localStorage.setItem("mm-participant", name);
   };
 
+  const loading = draftLoading || settingsLoading;
+  const participants = settings?.participants || [];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-2xl text-slate-400 animate-pulse">Loading...</div>
+        <div className="text-center">
+          <span className="text-6xl animate-float inline-block">🏀</span>
+          <div className="text-2xl text-slate-400 animate-pulse mt-4">Loading...</div>
+        </div>
       </div>
     );
   }
 
-  const currentDrafter = state ? getCurrentDrafter(state.currentPickIndex) : "";
+  const currentDrafter = state
+    ? getCurrentDrafter(state.currentPickIndex, participants)
+    : "";
   const picksMade = state?.picks.length ?? 0;
+  const totalPicks = Math.min(64, participants.length > 0 ? Math.ceil(64 / participants.length) * participants.length : 64);
+  const progress = totalPicks > 0 ? (picksMade / totalPicks) * 100 : 0;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold text-amber-400">
+      {/* Hero */}
+      <div className="text-center space-y-3 animate-slide-up">
+        <div className="text-6xl mb-2 animate-float inline-block">🏀</div>
+        <h1 className="text-5xl font-extrabold text-gradient">
           March Madness Pick&apos;em
         </h1>
-        <p className="text-slate-400 text-lg">2026 NCAA Tournament Draft</p>
+        <p className="text-slate-400 text-lg">
+          {settings?.year || new Date().getFullYear()} NCAA Tournament Draft
+        </p>
       </div>
 
-      {/* Status */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-lg font-semibold mb-3">Draft Status</h2>
+      {/* Status Card */}
+      <div className="glass-card rounded-2xl p-6 animate-slide-up" style={{ animationDelay: "100ms" }}>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span>📊</span> Draft Status
+        </h2>
         {state?.status === "complete" ? (
-          <div className="text-green-400 text-xl font-bold">
-            Draft Complete! All 64 teams have been picked.
+          <div className="text-center py-4">
+            <span className="text-4xl trophy-spin inline-block cursor-pointer">🏆</span>
+            <div className="text-green-400 text-xl font-bold mt-2">
+              Draft Complete!
+            </div>
+            <p className="text-slate-400">All {picksMade} teams have been picked.</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
+            {/* Progress Bar */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-slate-400">Progress</span>
+                <span className="text-amber-400 font-bold">{picksMade} / {totalPicks}</span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 animate-fill"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
             <p className="text-slate-300">
-              <span className="text-amber-400 font-bold">{picksMade}</span> / 64
-              picks made
-            </p>
-            <p className="text-slate-300">
-              Current pick:{" "}
-              <span className="text-white font-bold">{currentDrafter}</span>
+              On the clock:{" "}
+              <span className="text-white font-bold text-lg">{currentDrafter}</span>
             </p>
           </div>
         )}
       </div>
 
       {/* Select who you are */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-lg font-semibold mb-4">Who are you?</h2>
+      <div className="glass-card rounded-2xl p-6 animate-slide-up" style={{ animationDelay: "200ms" }}>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <span>👤</span> Who are you?
+        </h2>
         <p className="text-sm text-slate-400 mb-4">
           Select your name to make picks when it&apos;s your turn.
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          {PARTICIPANTS.map((name) => (
+        <div className="grid grid-cols-2 gap-3 stagger-children">
+          {participants.map((name) => (
             <button
               key={name}
               onClick={() => handleSelect(name)}
-              className={`px-4 py-3 rounded-lg font-medium transition-all ${
+              className={`px-4 py-3 rounded-xl font-medium transition-all hover-lift ${
                 selectedName === name
-                  ? "bg-amber-500 text-slate-900 ring-2 ring-amber-300"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 ring-2 ring-amber-300 shadow-lg shadow-amber-500/20"
+                  : "bg-slate-700/50 text-slate-300 hover:bg-slate-600/50"
               }`}
             >
               {name}
+              {selectedName === name && " ✓"}
             </button>
           ))}
         </div>
         {selectedName && (
-          <p className="mt-4 text-sm text-green-400">
-            You are logged in as <span className="font-bold">{selectedName}</span>
+          <p className="mt-4 text-sm text-green-400 animate-bounce-in">
+            Logged in as <span className="font-bold">{selectedName}</span>
           </p>
         )}
       </div>
 
-      {/* Go to draft */}
-      <div className="flex gap-4">
+      {/* Action Buttons */}
+      <div className="flex gap-4 animate-slide-up" style={{ animationDelay: "300ms" }}>
         <a
           href="/draft"
-          className="flex-1 text-center bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-4 rounded-xl text-lg transition"
+          className="flex-1 text-center bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-bold py-4 rounded-xl text-lg transition hover-lift shadow-lg shadow-amber-500/20"
         >
-          Go to Draft Board
+          🏀 Go to Draft Board
         </a>
         <a
           href="/scores"
-          className="flex-1 text-center bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl text-lg transition"
+          className="flex-1 text-center glass-card hover:bg-slate-700/80 text-white font-bold py-4 rounded-xl text-lg transition hover-lift"
         >
-          View Scores
+          🏆 View Scores
         </a>
       </div>
 
       {/* Draft Order */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <h2 className="text-lg font-semibold mb-3">Draft Order (Snake)</h2>
-        <div className="space-y-1">
-          {PARTICIPANTS.map((name, i) => (
-            <div key={name} className="flex items-center gap-3 text-slate-300">
-              <span className="text-amber-400 font-mono w-6">{i + 1}.</span>
-              <span>{name}</span>
+      <div className="glass-card rounded-2xl p-6 animate-slide-up" style={{ animationDelay: "400ms" }}>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span>📋</span> Draft Order (Snake)
+        </h2>
+        <div className="space-y-1 stagger-children">
+          {participants.map((name, i) => (
+            <div
+              key={name}
+              className={`flex items-center gap-3 p-2 rounded-lg transition ${
+                currentDrafter === name && state?.status === "drafting"
+                  ? "bg-amber-500/10 border border-amber-500/30"
+                  : "hover:bg-slate-700/30"
+              }`}
+            >
+              <span className="text-amber-400 font-mono w-8 text-right font-bold">
+                {i + 1}.
+              </span>
+              <span className={currentDrafter === name && state?.status === "drafting" ? "text-amber-400 font-bold" : "text-slate-300"}>
+                {name}
+              </span>
+              {currentDrafter === name && state?.status === "drafting" && (
+                <span className="text-xs bg-amber-500 text-black px-2 py-0.5 rounded-full font-bold animate-pulse ml-auto">
+                  ON THE CLOCK
+                </span>
+              )}
             </div>
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-3">
-          Snake draft: order reverses each round (1-8, 8-1, 1-8, ...)
+          Snake draft: order reverses each round (1→{participants.length}, {participants.length}→1, ...)
         </p>
       </div>
     </div>

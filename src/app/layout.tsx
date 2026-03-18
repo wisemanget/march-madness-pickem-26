@@ -14,19 +14,37 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen">
-        <nav className="bg-slate-800 border-b border-slate-700">
+        <nav className="glass-card sticky top-0 z-50 border-b border-slate-700/50">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" className="text-xl font-bold text-amber-400">
-              March Madness Pick&apos;em
+            <a href="/" className="flex items-center gap-2 group">
+              <span className="text-2xl animate-float">🏀</span>
+              <span className="text-xl font-bold text-gradient group-hover:opacity-80 transition">
+                March Madness Pick&apos;em
+              </span>
             </a>
-            <div className="flex gap-4">
-              <a href="/draft" className="text-slate-300 hover:text-white transition">
+            <div className="flex gap-1">
+              <a
+                href="/draft"
+                className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition font-medium"
+              >
                 Draft
               </a>
-              <a href="/scores" className="text-slate-300 hover:text-white transition">
+              <a
+                href="/scores"
+                className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition font-medium"
+              >
                 Scores
               </a>
-              <a href="/admin" className="text-slate-300 hover:text-white transition text-sm">
+              <a
+                href="/history"
+                className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition font-medium"
+              >
+                History
+              </a>
+              <a
+                href="/admin"
+                className="px-4 py-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-700/50 transition text-sm"
+              >
                 Admin
               </a>
             </div>
