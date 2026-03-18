@@ -1,78 +1,146 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Pick, Team } from "@/lib/types";
 
-interface ParticipantEntry {
+interface ParsedParticipant {
   name: string;
-  teamsText: string; // comma-separated team names
-  wins: Record<string, number>; // team name -> wins
+  teams: { name: string; wins: number }[];
+  totalPoints: number;
 }
 
-const EMPTY_ENTRY = (): ParticipantEntry => ({
-  name: "",
-  teamsText: "",
-  wins: {},
-});
+// Parse the Google Sheet tab-separated paste format
+// Layout: paired participant blocks side by side
+// Left block cols: [empty, name/team, point tally, total]
+// Right block cols: [empty, empty, name/team, point tally, total]
+// Participant header row has "Point tally" in it
+// Team rows have team name + optional point values
+// "Total Points =" marks end of block
+function parseSheetData(raw: string): ParsedParticipant[] {
+  const lines = raw.split("\n");
+  const participants: ParsedParticipant[] = [];
+
+  // Track current participant being built for left and right blocks
+  let leftParticipant: ParsedParticipant | null = null;
+  let rightParticipant: ParsedParticipant | null = null;
+
+  for (const line of lines) {
+    const cols = line.split("\t");
+
+    // Check for left-block participant header (col B has name, col C has "Point tally")
+    const colB = (cols[1] || "").trim();
+    const colC = (cols[2] || "").trim();
+    const colF = (cols[5] || cols[6] || "").trim(); // right block name
+    const colG = (cols[6] || cols[7] || "").trim(); // right block "Point tally"
+
+    // Detect participant header row: has "Point tally" somewhere
+    const isLeftHeader = colB && colC.toLowerCase().includes("point tally");
+    const isRightHeader = (() => {
+      // Check columns 5-8 for a name + "Point tally" pattern
+      for (let i = 5; i < Math.min(cols.length - 1, 9); i++) {
+        const name = (cols[i] || "").trim();
+        const next = (cols[i + 1] || "").trim();
+        if (name && !name.toLowerCase().includes("point tally") && !name.toLowerCase().includes("total points") && next.toLowerCase().includes("point tally")) {
+          return { name, tallyCol: i + 1 };
+        }
+      }
+      return null;
+    })();
+
+    if (isLeftHeader) {
+      // Save previous left participant
+      if (leftParticipant) participants.push(leftParticipant);
+      leftParticipant = { name: colB, teams: [], totalPoints: 0 };
+    }
+
+    if (isRightHeader) {
+      if (rightParticipant) participants.push(rightParticipant);
+      rightParticipant = { name: isRightHeader.name, teams: [], totalPoints: 0 };
+    }
+
+    // Skip header rows and total rows for team parsing
+    if (isLeftHeader || colC.toLowerCase().includes("point tally")) {
+      // Also check right side on same line
+      if (!isRightHeader) continue;
+      // If right header found, we handled it above
+      continue;
+    }
+
+    // Check for "Total Points =" in left block
+    const leftTotalMatch = cols.slice(0, 5).some((c) => (c || "").includes("Total Points"));
+    if (leftTotalMatch && leftParticipant) {
+      // Extract total from nearby column
+      for (let i = 0; i < 5; i++) {
+        const num = parseInt((cols[i] || "").trim());
+        if (!isNaN(num) && num > 0 && !(cols[i] || "").includes("Total")) {
+          leftParticipant.totalPoints = num;
+        }
+      }
+      participants.push(leftParticipant);
+      leftParticipant = null;
+    }
+
+    // Check for "Total Points =" in right block
+    const rightTotalMatch = cols.slice(5).some((c) => (c || "").includes("Total Points"));
+    if (rightTotalMatch && rightParticipant) {
+      for (let i = 5; i < cols.length; i++) {
+        const num = parseInt((cols[i] || "").trim());
+        if (!isNaN(num) && num > 0 && !(cols[i] || "").includes("Total")) {
+          rightParticipant.totalPoints = num;
+        }
+      }
+      participants.push(rightParticipant);
+      rightParticipant = null;
+    }
+
+    if (leftTotalMatch || rightTotalMatch) continue;
+
+    // Parse team rows for left block (col B = team name, col C = point tally)
+    if (leftParticipant && colB && !colB.toLowerCase().includes("total points") && !colB.toLowerCase().includes("point tally") && !colB.toLowerCase().includes("teams:")) {
+      const wins = parseInt(colC) || 0;
+      leftParticipant.teams.push({ name: colB, wins });
+    }
+
+    // Parse team rows for right block
+    if (rightParticipant) {
+      // Find the team name in the right block columns (typically col 5 or 6)
+      for (let i = 5; i < Math.min(cols.length, 9); i++) {
+        const cell = (cols[i] || "").trim();
+        if (cell && !cell.toLowerCase().includes("total points") && !cell.toLowerCase().includes("point tally") && !cell.toLowerCase().includes("teams:") && !cell.toLowerCase().includes("order:")) {
+          // Check if this looks like a team name (not a pure number)
+          if (!/^\d+$/.test(cell)) {
+            const winsCol = parseInt((cols[i + 1] || "").trim()) || 0;
+            rightParticipant.teams.push({ name: cell, wins: winsCol });
+            break; // Only one team per row per block
+          }
+        }
+      }
+    }
+  }
+
+  // Push any remaining participants
+  if (leftParticipant) participants.push(leftParticipant);
+  if (rightParticipant) participants.push(rightParticipant);
+
+  // Deduplicate (in case of double-push)
+  const seen = new Set<string>();
+  return participants.filter((p) => {
+    if (seen.has(p.name)) return false;
+    seen.add(p.name);
+    return p.teams.length > 0;
+  });
+}
 
 export default function ImportPage() {
   const [year, setYear] = useState(2025);
   const [champion, setChampion] = useState("");
-  const [entries, setEntries] = useState<ParticipantEntry[]>([
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-    EMPTY_ENTRY(),
-  ]);
-  const [step, setStep] = useState<"teams" | "wins" | "review">("teams");
+  const [pasteData, setPasteData] = useState("");
+  const [parsed, setParsed] = useState<ParsedParticipant[]>([]);
+  const [editParsed, setEditParsed] = useState<ParsedParticipant[]>([]);
+  const [step, setStep] = useState<"paste" | "review" | "done">("paste");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
-
-  // Parsed teams from text
-  const parseTeams = (text: string): string[] =>
-    text
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
-
-  const updateEntry = (index: number, field: Partial<ParticipantEntry>) => {
-    setEntries((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], ...field };
-      return next;
-    });
-  };
-
-  const updateWin = (entryIndex: number, teamName: string, wins: number) => {
-    setEntries((prev) => {
-      const next = [...prev];
-      next[entryIndex] = {
-        ...next[entryIndex],
-        wins: {
-          ...next[entryIndex].wins,
-          [teamName]: Math.max(0, Math.min(6, wins)),
-        },
-      };
-      return next;
-    });
-  };
-
-  const addEntry = () => setEntries([...entries, EMPTY_ENTRY()]);
-  const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
-
-  const validEntries = entries.filter((e) => e.name.trim() && e.teamsText.trim());
-  const allTeams = validEntries.flatMap((e) =>
-    parseTeams(e.teamsText).map((team) => ({
-      team,
-      owner: e.name,
-      wins: e.wins[team] || 0,
-    }))
-  );
 
   const showMsg = (text: string, type: "success" | "error" = "success") => {
     setMessage(text);
@@ -80,41 +148,85 @@ export default function ImportPage() {
     setTimeout(() => setMessage(""), 5000);
   };
 
+  const handleParse = () => {
+    if (!pasteData.trim()) {
+      showMsg("Paste your Google Sheet data first!", "error");
+      return;
+    }
+    const result = parseSheetData(pasteData);
+    if (result.length === 0) {
+      showMsg("Could not find any participants. Make sure you copied the full tab data.", "error");
+      return;
+    }
+    setParsed(result);
+    setEditParsed(JSON.parse(JSON.stringify(result)));
+    setStep("review");
+    showMsg(`Found ${result.length} participants with ${result.reduce((s, p) => s + p.teams.length, 0)} teams!`);
+  };
+
+  const updateTeamWins = (pIdx: number, tIdx: number, wins: number) => {
+    setEditParsed((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next[pIdx].teams[tIdx].wins = Math.max(0, Math.min(6, wins));
+      next[pIdx].totalPoints = next[pIdx].teams.reduce((s: number, t: { wins: number }) => s + t.wins, 0);
+      return next;
+    });
+  };
+
+  const removeTeam = (pIdx: number, tIdx: number) => {
+    setEditParsed((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next[pIdx].teams.splice(tIdx, 1);
+      next[pIdx].totalPoints = next[pIdx].teams.reduce((s: number, t: { wins: number }) => s + t.wins, 0);
+      return next;
+    });
+  };
+
+  const updateParticipantName = (pIdx: number, name: string) => {
+    setEditParsed((prev) => {
+      const next = [...prev];
+      next[pIdx] = { ...next[pIdx], name };
+      return next;
+    });
+  };
+
+  const updateTeamName = (pIdx: number, tIdx: number, name: string) => {
+    setEditParsed((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next[pIdx].teams[tIdx].name = name;
+      return next;
+    });
+  };
+
+  const totalTeams = editParsed.reduce((s, p) => s + p.teams.length, 0);
+
   const handleSave = async () => {
-    if (validEntries.length < 2) {
+    const valid = editParsed.filter((p) => p.name.trim() && p.teams.length > 0);
+    if (valid.length < 2) {
       showMsg("Need at least 2 participants with teams!", "error");
       return;
     }
 
     setSaving(true);
 
-    // Build picks and results
-    const participants = validEntries.map((e) => e.name.trim());
+    const participants = valid.map((p) => p.name.trim());
     const picks: Pick[] = [];
     const wins: Record<string, number> = {};
     const teams: Team[] = [];
     let pickNumber = 1;
 
-    for (const entry of validEntries) {
-      const teamNames = parseTeams(entry.teamsText);
-      for (const teamName of teamNames) {
-        const team: Team = {
-          name: teamName,
-          seed: 0, // seed unknown from sheet
-          region: "East" as const, // region unknown from sheet
-        };
-        teams.push(team);
-
+    for (const entry of valid) {
+      for (const team of entry.teams) {
+        const t: Team = { name: team.name, seed: 0, region: "East" };
+        teams.push(t);
         picks.push({
           pickNumber: pickNumber++,
           participantName: entry.name.trim(),
-          team,
+          team: t,
           timestamp: new Date().toISOString(),
         });
-
-        const teamWins = entry.wins[teamName] || 0;
-        if (teamWins > 0) {
-          wins[teamName] = teamWins;
+        if (team.wins > 0) {
+          wins[team.name] = team.wins;
         }
       }
     }
@@ -134,7 +246,8 @@ export default function ImportPage() {
       });
 
       if (res.ok) {
-        showMsg(`${year} data imported successfully! View it on the History page.`);
+        setStep("done");
+        showMsg(`${year} data imported successfully!`);
       } else {
         showMsg("Failed to save. Please try again.", "error");
       }
@@ -150,8 +263,8 @@ export default function ImportPage() {
       <div className="flex items-center gap-3 animate-slide-up">
         <span className="text-4xl">📋</span>
         <div>
-          <h1 className="text-3xl font-extrabold text-gradient">Import Historical Data</h1>
-          <p className="text-slate-400 text-sm">Bring in your Google Sheet data year by year</p>
+          <h1 className="text-3xl font-extrabold text-gradient">Import from Google Sheet</h1>
+          <p className="text-slate-400 text-sm">Paste a sheet tab and everything is auto-detected</p>
         </div>
       </div>
 
@@ -167,56 +280,19 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* How-to */}
-      <div className="glass-card rounded-2xl p-5 animate-slide-up" style={{ animationDelay: "50ms" }}>
-        <h2 className="font-semibold mb-2 flex items-center gap-2">
-          <span>💡</span> How to import from your Google Sheet
-        </h2>
-        <ol className="text-sm text-slate-400 space-y-1 list-decimal list-inside">
-          <li>Pick a year tab from your sheet (2022, 2023, 2024, or 2025)</li>
-          <li>For each person, type their name and paste their team list (comma-separated)</li>
-          <li>Click &quot;Next: Enter Wins&quot; to set how many wins each team got</li>
-          <li>Review and save — it shows up on the History page</li>
-        </ol>
-      </div>
-
-      {/* Year & Champion */}
-      <div className="glass-card rounded-2xl p-5 animate-slide-up" style={{ animationDelay: "100ms" }}>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm text-slate-400 mb-1 block font-medium">Year</label>
-            <input
-              type="number"
-              value={year}
-              onChange={(e) => setYear(parseInt(e.target.value) || 2025)}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-3 text-white text-xl font-bold focus:outline-none focus:border-amber-500/50"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-slate-400 mb-1 block font-medium">
-              Tournament Champion (optional)
-            </label>
-            <input
-              type="text"
-              value={champion}
-              onChange={(e) => setChampion(e.target.value)}
-              placeholder="e.g. UConn"
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Step indicator */}
       <div className="flex items-center gap-2 justify-center">
         {[
-          { id: "teams" as const, label: "1. Teams", icon: "🏀" },
-          { id: "wins" as const, label: "2. Wins", icon: "🏆" },
-          { id: "review" as const, label: "3. Review", icon: "✅" },
+          { id: "paste" as const, label: "1. Paste", icon: "📄" },
+          { id: "review" as const, label: "2. Review & Edit", icon: "✏️" },
+          { id: "done" as const, label: "3. Done", icon: "✅" },
         ].map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
             <button
-              onClick={() => setStep(s.id)}
+              onClick={() => {
+                if (s.id === "paste") setStep("paste");
+                if (s.id === "review" && editParsed.length > 0) setStep("review");
+              }}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 step === s.id
                   ? "bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-lg"
@@ -230,209 +306,113 @@ export default function ImportPage() {
         ))}
       </div>
 
-      {/* Step 1: Enter teams per participant */}
-      {step === "teams" && (
-        <div className="space-y-3 animate-slide-up">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span>🏀</span> Enter each participant&apos;s teams
-          </h2>
-          <p className="text-sm text-slate-400">
-            Type the participant name, then paste their teams separated by commas.
-            Copy team names straight from your sheet.
-          </p>
+      {/* Step 1: Paste */}
+      {step === "paste" && (
+        <div className="space-y-4 animate-slide-up">
+          {/* Instructions */}
+          <div className="glass-card rounded-2xl p-5">
+            <h2 className="font-semibold mb-2 flex items-center gap-2">
+              <span>💡</span> How to import
+            </h2>
+            <ol className="text-sm text-slate-400 space-y-1.5 list-decimal list-inside">
+              <li>Open your Google Sheet and click a year tab (2022, 2023, etc.)</li>
+              <li>Select <strong className="text-white">all the data</strong> — the participant blocks with teams and point tallies (Ctrl+A or Cmd+A works)</li>
+              <li>Copy it (Ctrl+C / Cmd+C)</li>
+              <li>Paste it into the box below (Ctrl+V / Cmd+V)</li>
+              <li>Hit <strong className="text-amber-400">&quot;Parse Sheet Data&quot;</strong> — names, teams, and wins are auto-detected</li>
+            </ol>
+          </div>
 
-          {entries.map((entry, i) => (
-            <div key={i} className="glass-card rounded-2xl p-4 group">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-amber-400 font-mono font-bold w-8">{i + 1}.</span>
+          {/* Year & Champion */}
+          <div className="glass-card rounded-2xl p-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block font-medium">Year</label>
+                <input
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(parseInt(e.target.value) || 2025)}
+                  className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-3 text-white text-xl font-bold focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block font-medium">Tournament Champion (optional)</label>
                 <input
                   type="text"
-                  value={entry.name}
-                  onChange={(e) => updateEntry(i, { name: e.target.value })}
-                  placeholder="Participant name (e.g. Chris K.)"
-                  className="flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50 font-medium"
+                  value={champion}
+                  onChange={(e) => setChampion(e.target.value)}
+                  placeholder="e.g. Florida"
+                  className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50"
                 />
-                {entries.length > 2 && (
-                  <button
-                    onClick={() => removeEntry(i)}
-                    className="w-8 h-8 rounded-lg bg-red-600/30 hover:bg-red-500/50 text-red-400 text-sm transition opacity-0 group-hover:opacity-100"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
-              <textarea
-                value={entry.teamsText}
-                onChange={(e) => updateEntry(i, { teamsText: e.target.value })}
-                placeholder="Teams (comma-separated): Florida, Gonzaga, Marquette, Furman, Drake, High Point, Bryant, Alabama St"
-                rows={2}
-                className="w-full bg-slate-700/30 border border-slate-600/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 resize-none"
-              />
-              {entry.teamsText && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {parseTeams(entry.teamsText).map((team) => (
-                    <span
-                      key={team}
-                      className="bg-amber-500/10 text-amber-300 text-xs px-2 py-1 rounded-lg border border-amber-500/20"
-                    >
-                      {team}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
+          </div>
 
-          <button
-            onClick={addEntry}
-            className="w-full glass-card rounded-xl py-3 text-slate-400 hover:text-white transition text-sm font-medium"
-          >
-            + Add Another Participant
-          </button>
-
-          <div className="flex justify-between items-center pt-2">
-            <span className="text-sm text-slate-500">
-              {validEntries.length} participants · {allTeams.length} teams entered
-            </span>
-            <button
-              onClick={() => setStep("wins")}
-              disabled={validEntries.length < 2}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
-            >
-              Next: Enter Wins →
-            </button>
+          {/* Paste box */}
+          <div className="glass-card rounded-2xl p-5">
+            <label className="text-sm text-slate-400 mb-2 block font-medium">
+              Paste your Google Sheet data here
+            </label>
+            <textarea
+              value={pasteData}
+              onChange={(e) => setPasteData(e.target.value)}
+              placeholder={"Paste the copied sheet data here...\n\nIt should look something like:\n\tChris K.\tPoint tally\ttotal\t\t\tLuke\tPoint tally\ttotal\n\tFlorida\t4\t\t\t\tSt John\t1\n\t..."}
+              rows={12}
+              className="w-full bg-slate-900/50 border border-slate-600/50 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50 resize-y font-mono"
+            />
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-slate-500">
+                {pasteData ? `${pasteData.split("\n").length} lines pasted` : "Nothing pasted yet"}
+              </span>
+              <button
+                onClick={handleParse}
+                disabled={!pasteData.trim()}
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
+              >
+                🔍 Parse Sheet Data
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Step 2: Enter wins per team */}
-      {step === "wins" && (
-        <div className="space-y-4 animate-slide-up">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span>🏆</span> Enter wins for each team
-          </h2>
-          <p className="text-sm text-slate-400">
-            How many tournament games did each team win? (0 = lost in first round, 6 = champion).
-            The &quot;Point tally&quot; number from your sheet = the wins count.
-          </p>
-
-          {validEntries.map((entry, entryIdx) => {
-            const teamNames = parseTeams(entry.teamsText);
-            if (teamNames.length === 0) return null;
-
-            const entryTotalWins = teamNames.reduce(
-              (sum, t) => sum + (entry.wins[t] || 0),
-              0
-            );
-
-            return (
-              <div key={entry.name} className="glass-card rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-lg">{entry.name}</h3>
-                  <span className="text-amber-400 font-bold">
-                    {entryTotalWins} pts
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {teamNames.map((teamName) => {
-                    const wins = entry.wins[teamName] || 0;
-                    return (
-                      <div
-                        key={teamName}
-                        className={`flex items-center justify-between bg-slate-700/30 rounded-xl px-4 py-2.5 ${
-                          wins > 0 ? "border-l-4 border-amber-500/50" : ""
-                        }`}
-                      >
-                        <span className="text-sm font-medium truncate mr-2">{teamName}</span>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() =>
-                              updateWin(entries.indexOf(entry), teamName, wins - 1)
-                            }
-                            className="w-8 h-8 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-sm transition"
-                          >
-                            −
-                          </button>
-                          <span className="w-8 text-center font-mono font-bold text-lg">
-                            {wins}
-                          </span>
-                          <button
-                            onClick={() =>
-                              updateWin(entries.indexOf(entry), teamName, wins + 1)
-                            }
-                            className="w-8 h-8 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-sm transition"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="flex justify-between items-center pt-2">
-            <button
-              onClick={() => setStep("teams")}
-              className="glass-card text-slate-300 hover:text-white px-6 py-3 rounded-xl transition font-medium"
-            >
-              ← Back to Teams
-            </button>
-            <button
-              onClick={() => setStep("review")}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
-            >
-              Next: Review →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Review & Save */}
+      {/* Step 2: Review & Edit */}
       {step === "review" && (
         <div className="space-y-4 animate-slide-up">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span>✅</span> Review & Save
-          </h2>
-
-          {/* Summary */}
-          <div className="glass-card rounded-2xl p-5 text-center">
-            <h3 className="text-3xl font-extrabold text-gradient mb-1">{year} Tournament</h3>
+          <div className="glass-card rounded-2xl p-4 text-center">
+            <h3 className="text-2xl font-extrabold text-gradient">{year} Tournament</h3>
             {champion && (
-              <p className="text-slate-300">
+              <p className="text-slate-300 text-sm mt-1">
                 🏆 Champion: <span className="text-amber-400 font-bold">{champion}</span>
               </p>
             )}
             <p className="text-sm text-slate-500 mt-1">
-              {validEntries.length} participants · {allTeams.length} teams
+              {editParsed.length} participants · {totalTeams} teams auto-detected
             </p>
           </div>
 
-          {/* Standings Preview */}
-          <div className="space-y-3">
-            {validEntries
-              .map((entry) => {
-                const teamNames = parseTeams(entry.teamsText);
-                const totalWins = teamNames.reduce(
-                  (sum, t) => sum + (entry.wins[t] || 0),
-                  0
-                );
-                return { ...entry, teamNames, totalWins };
-              })
-              .sort((a, b) => b.totalWins - a.totalWins)
-              .map((entry, rank) => (
+          <div className="glass-card rounded-2xl p-4">
+            <p className="text-sm text-slate-400 mb-1">
+              ✏️ Everything below was auto-parsed from your sheet. Review and fix anything that looks off — you can edit names, team names, and win counts. Then save.
+            </p>
+          </div>
+
+          {/* Editable standings */}
+          <div className="space-y-4">
+            {editParsed
+              .map((p, origIdx) => ({ ...p, origIdx }))
+              .sort((a, b) => b.totalPoints - a.totalPoints)
+              .map((participant, rank) => (
                 <div
-                  key={entry.name}
-                  className={`glass-card rounded-2xl p-4 ${
+                  key={participant.origIdx}
+                  className={`glass-card rounded-2xl p-5 ${
                     rank === 0 ? "border-2 border-amber-400/30" : "border border-slate-700/30"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                           rank === 0
                             ? "rank-gold"
                             : rank === 1
@@ -444,29 +424,57 @@ export default function ImportPage() {
                       >
                         {rank + 1}
                       </span>
-                      <span className="font-bold text-lg">{entry.name}</span>
+                      <input
+                        type="text"
+                        value={participant.name}
+                        onChange={(e) => updateParticipantName(participant.origIdx, e.target.value)}
+                        className="bg-transparent border-b border-slate-600 text-lg font-bold text-white focus:outline-none focus:border-amber-500 px-1 py-0.5"
+                      />
                     </div>
-                    <span className="text-2xl font-extrabold text-gradient">
-                      {entry.totalWins} pts
+                    <span className="text-2xl font-extrabold text-gradient shrink-0 ml-2">
+                      {participant.totalPoints} pts
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {entry.teamNames.map((team) => {
-                      const w = entry.wins[team] || 0;
-                      return (
-                        <span
-                          key={team}
-                          className={`text-xs px-2 py-1 rounded-lg ${
-                            w > 0
-                              ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                              : "bg-slate-700/30 text-slate-500"
-                          }`}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {participant.teams.map((team, tIdx) => (
+                      <div
+                        key={tIdx}
+                        className={`flex items-center gap-2 bg-slate-700/30 rounded-xl px-3 py-2 group ${
+                          team.wins > 0 ? "border-l-4 border-amber-500/50" : ""
+                        }`}
+                      >
+                        <input
+                          type="text"
+                          value={team.name}
+                          onChange={(e) => updateTeamName(participant.origIdx, tIdx, e.target.value)}
+                          className="flex-1 bg-transparent text-sm font-medium text-white focus:outline-none border-b border-transparent focus:border-slate-500 min-w-0"
+                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => updateTeamWins(participant.origIdx, tIdx, team.wins - 1)}
+                            className="w-7 h-7 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-xs transition"
+                          >
+                            −
+                          </button>
+                          <span className="w-6 text-center font-mono font-bold">
+                            {team.wins}
+                          </span>
+                          <button
+                            onClick={() => updateTeamWins(participant.origIdx, tIdx, team.wins + 1)}
+                            className="w-7 h-7 rounded-lg bg-slate-600/50 hover:bg-slate-500 text-white text-xs transition"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => removeTeam(participant.origIdx, tIdx)}
+                          className="w-6 h-6 rounded text-red-400 hover:bg-red-600/30 text-xs transition opacity-0 group-hover:opacity-100"
                         >
-                          {team}
-                          {w > 0 && ` (${w}W)`}
-                        </span>
-                      );
-                    })}
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -474,10 +482,10 @@ export default function ImportPage() {
 
           <div className="flex justify-between items-center pt-2">
             <button
-              onClick={() => setStep("wins")}
+              onClick={() => setStep("paste")}
               className="glass-card text-slate-300 hover:text-white px-6 py-3 rounded-xl transition font-medium"
             >
-              ← Back to Wins
+              ← Re-paste
             </button>
             <button
               onClick={handleSave}
@@ -485,6 +493,40 @@ export default function ImportPage() {
               className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 disabled:opacity-50 text-black font-bold px-8 py-3 rounded-xl transition hover-lift shadow-lg shadow-green-500/20 text-lg"
             >
               {saving ? "Saving..." : "💾 Save to History"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Done */}
+      {step === "done" && (
+        <div className="glass-card rounded-2xl p-8 text-center animate-bounce-in">
+          <span className="text-6xl block mb-4 trophy-spin inline-block">🏆</span>
+          <h2 className="text-2xl font-extrabold text-gradient mb-2">
+            {year} Imported Successfully!
+          </h2>
+          <p className="text-slate-400 mb-6">
+            {editParsed.length} participants and {totalTeams} teams saved.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <a
+              href="/history"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold px-6 py-3 rounded-xl transition hover-lift shadow-lg shadow-amber-500/20"
+            >
+              📚 View History
+            </a>
+            <button
+              onClick={() => {
+                setPasteData("");
+                setParsed([]);
+                setEditParsed([]);
+                setChampion("");
+                setYear((y) => y - 1);
+                setStep("paste");
+              }}
+              className="glass-card text-white font-bold px-6 py-3 rounded-xl transition hover-lift"
+            >
+              📋 Import Another Year
             </button>
           </div>
         </div>
