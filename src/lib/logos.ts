@@ -74,7 +74,8 @@ const ESPN_IDS: Record<string, number> = {
   "st louis": 139,
   "st. louis": 139,
   "santa clara": 2541,
-  "smu": 2567,
+  "miami (oh)": 193,
+  "miami ohio": 193,
   "akron": 2006,
   "hofstra": 2275,
   "wright state": 2750,
@@ -254,7 +255,7 @@ export function getTeamColor(teamName: string): string {
 export function getTeamInitials(teamName: string): string {
   // Handle abbreviations
   const upper = teamName.toUpperCase();
-  if (["UCLA", "UCF", "BYU", "VCU", "SMU", "TCU", "LSU", "UMBC", "UNLV", "UAB"].includes(upper)) {
+  if (["UCLA", "UCF", "BYU", "VCU", "TCU", "LSU", "UMBC", "UNLV", "UAB"].includes(upper)) {
     return upper.slice(0, 3);
   }
   // Handle "St." prefix

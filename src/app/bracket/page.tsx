@@ -11,6 +11,7 @@ import {
   REGION_NAMES,
 } from "@/lib/bracket";
 import TeamLogo from "@/components/TeamLogo";
+import { FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 
 // Map ESPN round strings to our round numbers
 const ESPN_ROUND_MAP: Record<string, number> = {
@@ -397,7 +398,8 @@ export default function BracketPage() {
     if (!state) return {} as Record<string, string>;
     const map: Record<string, string> = {};
     for (const pick of state.picks) {
-      map[pick.team.name] = pick.participantName;
+      const teamName = FIRST_FOUR_REPLACEMENTS[pick.team.name] || pick.team.name;
+      map[teamName] = pick.participantName;
     }
     return map;
   }, [state]);

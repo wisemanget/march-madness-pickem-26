@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchLiveGames, computeWinsFromGames } from "@/lib/espn";
 import { store } from "@/lib/store";
 import { TournamentResults } from "@/lib/types";
+import { FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -70,11 +71,17 @@ export async function POST() {
 
     // For teams NOT in ESPN data, keep existing manual values (no change)
 
+    // Clean up stale First Four team entries (e.g. "SMU" replaced by "Miami (OH)")
+    for (const oldName of Object.keys(FIRST_FOUR_REPLACEMENTS)) {
+      delete mergedWins[oldName];
+    }
+
     // Merge eliminated lists
     const existingEliminated = existing?.eliminated || [];
+    const staleNames = new Set(Object.keys(FIRST_FOUR_REPLACEMENTS));
     const mergedEliminated = Array.from(
       new Set([...existingEliminated, ...eliminated])
-    );
+    ).filter((name) => !staleNames.has(name));
 
     const results: TournamentResults = {
       wins: mergedWins,

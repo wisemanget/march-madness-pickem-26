@@ -1,5 +1,11 @@
 import { Team } from "./types";
 
+// First Four results: maps eliminated play-in team to the winner that took their spot.
+// Used to remap draft picks that referenced the pre-play-in team.
+export const FIRST_FOUR_REPLACEMENTS: Record<string, string> = {
+  "SMU": "Miami (OH)",
+};
+
 export const TEAMS: Team[] = [
   // ===== EAST REGION =====
   { name: "Duke", seed: 1, region: "East" },
@@ -48,7 +54,7 @@ export const TEAMS: Team[] = [
   { name: "Georgia", seed: 8, region: "Midwest" },
   { name: "Saint Louis", seed: 9, region: "Midwest" },
   { name: "Santa Clara", seed: 10, region: "Midwest" },
-  { name: "SMU", seed: 11, region: "Midwest" },
+  { name: "Miami (OH)", seed: 11, region: "Midwest" },
   { name: "Akron", seed: 12, region: "Midwest" },
   { name: "Hofstra", seed: 13, region: "Midwest" },
   { name: "Wright State", seed: 14, region: "Midwest" },

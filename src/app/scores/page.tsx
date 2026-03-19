@@ -6,6 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { LiveGame, TournamentResults } from "@/lib/types";
 import { calculateTeamPoints, remainingPossiblePoints, maxPossibleScore } from "@/lib/scoring";
 import TeamLogo from "@/components/TeamLogo";
+import { FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 
 const REGION_STRIPE: Record<string, string> = {
   East: "region-east",
@@ -262,7 +263,8 @@ export default function ScoresPage() {
     if (!state) return {} as Record<string, string>;
     const map: Record<string, string> = {};
     for (const pick of state.picks) {
-      map[pick.team.name] = pick.participantName;
+      const teamName = FIRST_FOUR_REPLACEMENTS[pick.team.name] || pick.team.name;
+      map[teamName] = pick.participantName;
     }
     return map;
   }, [state]);
