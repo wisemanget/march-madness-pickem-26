@@ -49,13 +49,26 @@ export async function POST() {
     // Compute wins from final games
     const { wins: espnWins, eliminated } = computeWinsFromGames(uniqueGames);
 
-    // Merge with existing results (keep the higher win count)
+    // Merge ESPN wins with existing results.
+    // ESPN is the source of truth for teams it reports on — use its value directly.
+    // Only preserve existing values for teams ESPN doesn't have data for (manual entries).
     const existing = await store.getResults();
     const mergedWins: Record<string, number> = { ...(existing?.wins || {}) };
 
-    for (const [team, wins] of Object.entries(espnWins)) {
-      mergedWins[team] = Math.max(mergedWins[team] || 0, wins);
+    // All teams that appeared in any ESPN game (winners and losers)
+    const teamsInEspn = new Set<string>();
+    for (const game of uniqueGames) {
+      if (game.status !== "post") continue;
+      teamsInEspn.add(game.homeTeam.name);
+      teamsInEspn.add(game.awayTeam.name);
     }
+
+    // For teams ESPN knows about, use ESPN's computed wins (replaces old values)
+    for (const team of teamsInEspn) {
+      mergedWins[team] = espnWins[team] || 0;
+    }
+
+    // For teams NOT in ESPN data, keep existing manual values (no change)
 
     // Merge eliminated lists
     const existingEliminated = existing?.eliminated || [];
