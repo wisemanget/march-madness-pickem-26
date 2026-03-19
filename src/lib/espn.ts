@@ -245,6 +245,9 @@ export function computeWinsFromGames(
   for (const game of games) {
     if (game.status !== "post") continue; // only count final games
 
+    // Skip First Four (play-in) games — they don't count toward tournament scoring
+    if (game.round === "First Four") continue;
+
     const winner = game.homeTeam.winner ? game.homeTeam : game.awayTeam;
     const loser = game.homeTeam.winner ? game.awayTeam : game.homeTeam;
 
