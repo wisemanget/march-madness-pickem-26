@@ -195,9 +195,10 @@ export async function fetchLiveGames(date?: string): Promise<LiveGame[]> {
       gameStatus = "in";
     }
 
-    // Get round info
-    const roundNumber = event.season?.type || competition?.tournamentRoundNumber || 0;
-    const roundName = ROUND_MAP[roundNumber] || event.season?.slug || "";
+    // Get round info — prefer tournamentRoundNumber (1=First Four, 2=R64, etc.)
+    // event.season.type is the SEASON type (e.g. 3=postseason), not the round!
+    const roundNumber = competition?.tournamentRoundNumber || 0;
+    const roundName = ROUND_MAP[roundNumber] || "";
 
     // Parse competitors (home = index 0 or isHome, away = other)
     const home = competitors.find((c: any) => c.homeAway === "home") || competitors[0];
