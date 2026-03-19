@@ -280,11 +280,12 @@ export default function ScoresPage() {
       .map((name) => {
         const myPicks = state.picks.filter((p) => p.participantName === name);
         const teams = myPicks.map((p) => {
-          const wins = results.wins[p.team.name] || 0;
+          const teamName = FIRST_FOUR_REPLACEMENTS[p.team.name] || p.team.name;
+          const wins = results.wins[teamName] || 0;
           const points = calculateTeamPoints(wins);
-          const isEliminated = eliminated.has(p.team.name);
+          const isEliminated = eliminated.has(teamName);
           const remaining = remainingPossiblePoints(wins, isEliminated);
-          return { ...p.team, wins, points, eliminated: isEliminated, remaining };
+          return { ...p.team, name: teamName, wins, points, eliminated: isEliminated, remaining };
         });
         const totalPoints = teams.reduce((sum, t) => sum + t.points, 0);
         const totalWins = teams.reduce((sum, t) => sum + t.wins, 0);

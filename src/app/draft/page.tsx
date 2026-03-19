@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
 import { useNotifications } from "@/hooks/useNotifications";
-import { TEAMS } from "@/lib/teams";
+import { TEAMS, FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 import { Team } from "@/lib/types";
 import {
   getCurrentDrafter,
@@ -342,6 +342,7 @@ export default function DraftPage() {
                       const pickIndex =
                         round * n + headers.indexOf(name);
                       const pick = state.picks[pickIndex] || null;
+                      const displayName = pick ? (FIRST_FOUR_REPLACEMENTS[pick.team.name] || pick.team.name) : "";
                       const isCurrentPick =
                         state.status === "drafting" &&
                         pickIndex === state.currentPickIndex;
@@ -361,7 +362,7 @@ export default function DraftPage() {
                                 REGION_COLORS[pick.team.region]
                               }`}
                             >
-                              <TeamLogo teamName={pick.team.name} size="xs" />
+                              <TeamLogo teamName={displayName} size="xs" />
                               <span
                                 className={`inline-block w-4 h-4 rounded-full text-[9px] font-bold leading-4 text-center shrink-0 ${seedColor(
                                   pick.team.seed
@@ -370,7 +371,7 @@ export default function DraftPage() {
                                 {pick.team.seed}
                               </span>
                               <span className="font-medium truncate">
-                                {pick.team.name}
+                                {displayName}
                               </span>
                             </div>
                           ) : (
@@ -415,14 +416,16 @@ export default function DraftPage() {
                 </div>
                 {myPicks.length > 0 ? (
                   <div className="grid grid-cols-2 gap-1.5">
-                    {myPicks.map((pick) => (
+                    {myPicks.map((pick) => {
+                      const displayName = FIRST_FOUR_REPLACEMENTS[pick.team.name] || pick.team.name;
+                      return (
                       <div
-                        key={pick.team.name}
+                        key={displayName}
                         className={`rounded-lg px-2 py-1.5 text-xs border flex items-center gap-1.5 ${
                           REGION_COLORS[pick.team.region]
                         }`}
                       >
-                        <TeamLogo teamName={pick.team.name} size="xs" />
+                        <TeamLogo teamName={displayName} size="xs" />
                         <span
                           className={`w-4 h-4 rounded-full text-[9px] font-bold leading-4 text-center shrink-0 ${seedColor(
                             pick.team.seed
@@ -431,10 +434,10 @@ export default function DraftPage() {
                           {pick.team.seed}
                         </span>
                         <span className="font-medium truncate">
-                          {pick.team.name}
+                          {displayName}
                         </span>
-                      </div>
-                    ))}
+                      </div>);
+                    })}
                   </div>
                 ) : (
                   <span className="text-xs text-slate-600">No picks yet</span>

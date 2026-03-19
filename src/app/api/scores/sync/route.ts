@@ -76,12 +76,16 @@ export async function POST() {
       delete mergedWins[oldName];
     }
 
-    // Merge eliminated lists
+    // Rebuild eliminated list: ESPN is authoritative for teams it reports on.
+    // Only preserve existing eliminated entries for teams NOT in ESPN data (manual entries).
     const existingEliminated = existing?.eliminated || [];
     const staleNames = new Set(Object.keys(FIRST_FOUR_REPLACEMENTS));
+    const manualEliminated = existingEliminated.filter(
+      (name) => !teamsInEspn.has(name) && !staleNames.has(name)
+    );
     const mergedEliminated = Array.from(
-      new Set([...existingEliminated, ...eliminated])
-    ).filter((name) => !staleNames.has(name));
+      new Set([...manualEliminated, ...eliminated])
+    );
 
     const results: TournamentResults = {
       wins: mergedWins,
