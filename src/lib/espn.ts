@@ -246,8 +246,11 @@ export function computeWinsFromGames(
   for (const game of games) {
     if (game.status !== "post") continue; // only count final games
 
-    // Skip First Four (play-in) games — they don't count toward tournament scoring
-    if (game.round === "First Four") continue;
+    // Skip First Four (play-in) games — they don't count toward tournament scoring.
+    // Detect by: both teams have the same seed (e.g. 16 vs 16, 11 vs 11).
+    // ESPN doesn't reliably provide tournamentRoundNumber, so we use this heuristic.
+    if (game.round === "First Four" ||
+        (game.homeTeam.seed > 0 && game.homeTeam.seed === game.awayTeam.seed)) continue;
 
     const winner = game.homeTeam.winner ? game.homeTeam : game.awayTeam;
     const loser = game.homeTeam.winner ? game.awayTeam : game.homeTeam;
