@@ -82,7 +82,7 @@ const ESPN_IDS: Record<string, number> = {
   "wright st": 2750,
   "tennessee state": 2634,
   "tennessee st": 2634,
-  "umbc": 2104,
+  "howard bison": 47,
 
   // === WEST REGION ===
   "arizona": 12,
@@ -100,8 +100,7 @@ const ESPN_IDS: Record<string, number> = {
   "utah st.": 328,
   "missouri": 142,
   "mizzou": 142,
-  "nc state": 152,
-  "north carolina state": 152,
+  "texas longhorns": 251,
   "high point": 2272,
   "hawaii": 62,
   "hawai'i": 62,
@@ -255,7 +254,7 @@ export function getTeamColor(teamName: string): string {
 export function getTeamInitials(teamName: string): string {
   // Handle abbreviations
   const upper = teamName.toUpperCase();
-  if (["UCLA", "UCF", "BYU", "VCU", "TCU", "LSU", "UMBC", "UNLV", "UAB"].includes(upper)) {
+  if (["UCLA", "UCF", "BYU", "VCU", "TCU", "LSU", "UNLV", "UAB"].includes(upper)) {
     return upper.slice(0, 3);
   }
   // Handle "St." prefix

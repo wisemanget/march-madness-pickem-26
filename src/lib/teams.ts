@@ -4,6 +4,8 @@ import { Team } from "./types";
 // Used to remap draft picks that referenced the pre-play-in team.
 export const FIRST_FOUR_REPLACEMENTS: Record<string, string> = {
   "SMU": "Miami (OH)",
+  "UMBC": "Howard",
+  "NC State": "Texas",
 };
 
 export const TEAMS: Team[] = [
@@ -59,7 +61,7 @@ export const TEAMS: Team[] = [
   { name: "Hofstra", seed: 13, region: "Midwest" },
   { name: "Wright State", seed: 14, region: "Midwest" },
   { name: "Tennessee State", seed: 15, region: "Midwest" },
-  { name: "UMBC", seed: 16, region: "Midwest" },
+  { name: "Howard", seed: 16, region: "Midwest" },
 
   // ===== WEST REGION =====
   { name: "Arizona", seed: 1, region: "West" },
@@ -72,7 +74,7 @@ export const TEAMS: Team[] = [
   { name: "Villanova", seed: 8, region: "West" },
   { name: "Utah State", seed: 9, region: "West" },
   { name: "Missouri", seed: 10, region: "West" },
-  { name: "NC State", seed: 11, region: "West" },
+  { name: "Texas", seed: 11, region: "West" },
   { name: "High Point", seed: 12, region: "West" },
   { name: "Hawaii", seed: 13, region: "West" },
   { name: "Kennesaw State", seed: 14, region: "West" },
