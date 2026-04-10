@@ -530,8 +530,9 @@ function AdminContent() {
           </p>
 
           {regions.map((region) => {
+            const replacementNames = new Set(Object.values(FIRST_FOUR_REPLACEMENTS));
             const regionTeams = TEAMS.filter(
-              (t) => t.region === region && draftedTeams.includes(t.name)
+              (t) => t.region === region && (draftedTeams.includes(t.name) || replacementNames.has(t.name))
             ).sort((a, b) => a.seed - b.seed);
 
             if (regionTeams.length === 0) return null;
