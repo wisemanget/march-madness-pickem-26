@@ -42,10 +42,11 @@ export default function HistoryPage() {
       .map((name) => {
         const myPicks = picks.filter((p) => p.participantName === name);
         const teams = myPicks.map((p) => {
-          const teamName = FIRST_FOUR_REPLACEMENTS[p.team.name] || p.team.name;
-          const wins = results.wins?.[teamName] || 0;
+          const replacedName = FIRST_FOUR_REPLACEMENTS[p.team.name] || p.team.name;
+          // Try the replacement name first (ESPN-synced results), fall back to original (manual results)
+          const wins = results.wins?.[replacedName] ?? results.wins?.[p.team.name] ?? 0;
           const points = calculateTeamPoints(wins);
-          return { ...p.team, name: teamName, wins, points };
+          return { ...p.team, name: replacedName, wins, points };
         });
         const totalPoints = teams.reduce((sum, t) => sum + t.points, 0);
         const totalWins = teams.reduce((sum, t) => sum + t.wins, 0);

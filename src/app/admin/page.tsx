@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDraftState } from "@/hooks/useDraftState";
 import { useSettings } from "@/hooks/useSettings";
-import { TEAMS } from "@/lib/teams";
+import { TEAMS, FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 import { TournamentResults } from "@/lib/types";
 import TeamLogo from "@/components/TeamLogo";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -278,7 +278,7 @@ function AdminContent() {
     }
   };
 
-  const draftedTeams = state?.picks.map((p) => p.team.name) || [];
+  const draftedTeams = state?.picks.map((p) => FIRST_FOUR_REPLACEMENTS[p.team.name] || p.team.name) || [];
   const regions = ["East", "South", "Midwest", "West"] as const;
 
   const tabs = [
