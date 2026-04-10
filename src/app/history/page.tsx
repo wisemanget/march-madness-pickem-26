@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { HistoricalYear } from "@/lib/types";
 import { calculateTeamPoints } from "@/lib/scoring";
+import { FIRST_FOUR_REPLACEMENTS } from "@/lib/teams";
 import TeamLogo from "@/components/TeamLogo";
 
 export default function HistoryPage() {
@@ -41,9 +42,10 @@ export default function HistoryPage() {
       .map((name) => {
         const myPicks = picks.filter((p) => p.participantName === name);
         const teams = myPicks.map((p) => {
-          const wins = results.wins?.[p.team.name] || 0;
+          const teamName = FIRST_FOUR_REPLACEMENTS[p.team.name] || p.team.name;
+          const wins = results.wins?.[teamName] || 0;
           const points = calculateTeamPoints(wins);
-          return { ...p.team, wins, points };
+          return { ...p.team, name: teamName, wins, points };
         });
         const totalPoints = teams.reduce((sum, t) => sum + t.points, 0);
         const totalWins = teams.reduce((sum, t) => sum + t.wins, 0);
