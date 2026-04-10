@@ -132,7 +132,7 @@ function parseSheetData(raw: string): ParsedParticipant[] {
 }
 
 export default function ImportPage() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
   const [champion, setChampion] = useState("");
   const [pasteData, setPasteData] = useState("");
   const [parsed, setParsed] = useState<ParsedParticipant[]>([]);
@@ -331,7 +331,7 @@ export default function ImportPage() {
                 <input
                   type="number"
                   value={year}
-                  onChange={(e) => setYear(parseInt(e.target.value) || 2025)}
+                  onChange={(e) => setYear(parseInt(e.target.value) || 2026)}
                   className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-3 text-white text-xl font-bold focus:outline-none focus:border-amber-500/50"
                 />
               </div>

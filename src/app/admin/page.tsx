@@ -98,7 +98,7 @@ function AdminContent() {
   const [reassignTo, setReassignTo] = useState("");
 
   // History
-  const [histYear, setHistYear] = useState(2025);
+  const [histYear, setHistYear] = useState(2026);
   const [histChampion, setHistChampion] = useState("");
   const [savingHistory, setSavingHistory] = useState(false);
 
@@ -679,7 +679,7 @@ function AdminContent() {
                 type="number"
                 value={histYear}
                 onChange={(e) =>
-                  setHistYear(parseInt(e.target.value) || 2025)
+                  setHistYear(parseInt(e.target.value) || 2026)
                 }
                 className="w-full bg-slate-700/50 border border-slate-600/50 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-amber-500/50"
               />
